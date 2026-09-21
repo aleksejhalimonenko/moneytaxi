@@ -1,562 +1,386 @@
-/* ═══════════════════════════════════════════════════
-   MoneyTaxi WebApp — frontend (v25, синхр. с ботом v23)
-   ═══════════════════════════════════════════════════ */
+<!DOCTYPE html>
+<html class="dark" lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10141a">
+<title>MoneyTaxi</title>
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbyasv6tjR__pNpLH8_vMV8pqFJD7_EoatqX_DgtZTFCce2key2niHyRFQK2huLyUJGe/exec';
+<!-- ⚠️ ОБЯЗАТЕЛЬНО ДО app.js -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-const tg = window.Telegram && window.Telegram.WebApp;
-const initData = tg ? (tg.initData || '') : '';
-
-// === Helpers ===
-function fmt(n) {
-  return Number(n || 0).toLocaleString('ru-RU', {
-    minimumFractionDigits: 2, maximumFractionDigits: 2
-  }) + ' zł';
-}
-
-function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
-    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-  }[c]));
-}
-
-function toast(msg) {
-  const el = document.getElementById('save-toast');
-  if (!el) return;
-  const txt = el.querySelector('.flex-1');
-  if (txt) txt.textContent = msg;
-  el.classList.remove('hidden');
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.add('hidden'), 2500);
-}
-
-function showError(msg) {
-  const el = document.getElementById('error-box');
-  if (!el) return;
-  el.classList.remove('hidden');
-  document.getElementById('error-msg').textContent = msg;
-}
-
-function hideError() {
-  const el = document.getElementById('error-box');
-  if (el) el.classList.add('hidden');
-}
-
-function hideLoading() {
-  const el = document.getElementById('loading');
-  if (el) el.classList.add('hidden');
-}
-
-// === API ===
-async function apiGet(action, params = {}) {
-  try {
-    const qs = new URLSearchParams({ action, initData, ...params });
-    const res = await fetch(`${API_URL}?${qs.toString()}`);
-    return await res.json();
-  } catch (err) {
-    return { ok: false, error: 'network', message: err.message };
-  }
-}
-
-async function apiPost(action, payload = {}) {
-  try {
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, initData, ...payload })
-    });
-    return await res.json();
-  } catch (err) {
-    return { ok: false, error: 'network', message: err.message };
-  }
-}
-
-// === Tab Switching ===
-function switchTab(name) {
-  document.querySelectorAll('#tab-dashboard, #tab-screenshots, #tab-calculator, #tab-settings')
-    .forEach(el => { el.classList.add('hidden'); el.classList.remove('flex'); });
-
-  const target = document.getElementById('tab-' + name);
-  if (!target) return;
-  target.classList.remove('hidden');
-  target.classList.add('flex');
-  target.classList.add('fade-in');
-
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    if (btn.dataset.tab === name) {
-      btn.classList.add('text-primary');
-      btn.classList.remove('text-on-surface-variant');
-    } else {
-      btn.classList.remove('text-primary');
-      btn.classList.add('text-on-surface-variant');
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link href="https://fonts.gstatic.com" rel="preconnect" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: { extend: {
+    colors: {
+      "surface":"#10141a","surface-dim":"#10141a",
+      "surface-container-lowest":"#0a0e14","surface-container-low":"#181c22",
+      "surface-container":"#1c2026","surface-container-high":"#262a31",
+      "surface-container-highest":"#31353c",
+      "on-surface":"#dfe2eb","on-surface-variant":"#bacbbe",
+      "primary":"#6dffba","on-primary":"#003822",
+      "primary-container":"#00e599","on-primary-container":"#00613e",
+      "primary-fixed":"#4dffb2","primary-fixed-dim":"#00e297",
+      "secondary":"#98cbff","on-secondary":"#003354",
+      "secondary-container":"#00a2fd","on-secondary-container":"#003558",
+      "tertiary":"#ffe1b1","on-tertiary":"#412d00",
+      "tertiary-container":"#ffbe36","on-tertiary-container":"#6f4e00",
+      "error":"#ffb4ab","on-error":"#690005","error-container":"#93000a",
+      "outline":"#849589","outline-variant":"#3b4a41",
+      "background":"#10141a","on-background":"#dfe2eb"
+    },
+    fontFamily: {
+      "headline":"Space Grotesk","body":"Inter","mono":"JetBrains Mono"
     }
-  });
-
-  if (name === 'dashboard')   loadDashboard();
-  if (name === 'screenshots') loadQueue();
-  if (name === 'calculator')  loadCalcDefaults();
-  if (name === 'settings')    loadSettings();
-}
-
-// === Dashboard ===
-async function loadDashboard() {
-  hideError();
-  try {
-    const data = await apiGet('dashboard');
-    if (!data.ok) { showError(data.error || 'dashboard_failed'); return; }
-
-    if (data.empty) {
-      document.getElementById('dash-last-empty').classList.remove('hidden');
-      document.getElementById('dash-last').classList.add('hidden');
-      document.getElementById('dash-last').classList.remove('flex');
-      document.getElementById('dash-total').textContent = 'Всего: 0 недель';
-      return;
-    }
-
-    document.getElementById('dash-last-empty').classList.add('hidden');
-    document.getElementById('dash-last').classList.remove('hidden');
-    document.getElementById('dash-last').classList.add('flex');
-
-    const w = data.lastWeek || {};
-    document.getElementById('dash-period').textContent = w.dateRange || '—';
-    document.getElementById('dash-platform').textContent = (w.platform || '') + ' • ' + (w.mode || '');
-    document.getElementById('dash-net-cash').textContent = fmt(w.netCash);
-    document.getElementById('dash-net-full').textContent = fmt(w.netFull);
-    document.getElementById('dash-gross').textContent    = fmt(w.gross);
-    document.getElementById('dash-card').textContent     = fmt(w.cardPayout);
-    document.getElementById('dash-fuel').textContent     = fmt(w.fuel);
-    document.getElementById('dash-km').textContent       = (w.km || 0) + ' км';
-    document.getElementById('dash-total').textContent    = 'Всего: ' + (data.totalReports || 0) + ' недель';
-
-    const spark = data.sparkline || [];
-    const container = document.getElementById('dash-sparkline');
-    if (spark.length === 0) {
-      container.innerHTML = '<div class="w-full text-center text-on-surface-variant font-mono text-[10px] py-4">нет данных</div>';
-    } else {
-      const max = Math.max(...spark.map(s => Number(s.net) || 0), 1);
-      container.innerHTML = spark.map(s => {
-        const h = Math.max(4, Math.round((Number(s.net) || 0) / max * 70));
-        const ttl = esc((s.period || '') + ': ' + fmt(s.net));
-        return `<div class="flex-1 bg-primary/60 rounded-t" style="height:${h}px" title="${ttl}"></div>`;
-      }).join('');
-    }
-
-    const s4 = data.summary4 || {};
-    document.getElementById('sum4-card').textContent = fmt(s4.card);
-    document.getElementById('sum4-cash').textContent = fmt(s4.cash);
-    document.getElementById('sum4-net').textContent  = fmt(s4.net);
-    document.getElementById('sum4-fuel').textContent = fmt(s4.netFuel);
-    document.getElementById('sum4-full').textContent = fmt(s4.netFull);
-  } catch (err) {
-    showError('Dashboard: ' + err.message);
-  } finally {
-    hideLoading();
+  }}
+};
+</script>
+<style>
+  html, body { background:#10141a; color:#dfe2eb; }
+  html { min-height: -webkit-fill-available; }
+  body {
+    font-family: Inter, sans-serif;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
   }
-}
+  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+  ::-webkit-scrollbar { display: none; }
+  .spinner { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .fade-in { animation: fadeIn .25s ease-out; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(4px);} to {opacity:1;transform:translateY(0);} }
+  .hidden { display: none !important; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+</style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
 
-// === Queue ===
-async function loadQueue() {
-  hideError();
-  try {
-    const data = await apiGet('queue');
-    if (!data.ok) { showError(data.error || 'queue_failed'); return; }
-    renderQueue(data.screenshots || []);
-  } catch (err) {
-    showError('Queue: ' + err.message);
-  }
-}
+<header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe shadow-[0_1px_12px_rgba(0,0,0,0.3)]">
+  <div class="h-16 px-4 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+      <span class="material-symbols-outlined text-primary text-[18px]">local_taxi</span>
+      <h1 class="font-headline text-lg font-semibold tracking-tight truncate">MoneyTaxi</h1>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <div class="bg-surface-container-high rounded-full p-0.5 flex items-center">
+        <button id="hdr-lite" class="px-2 py-1 rounded-full text-on-primary bg-primary font-mono text-[10px] font-bold uppercase transition-all" type="button">Lite</button>
+        <button id="hdr-pro"  class="px-2 py-1 rounded-full text-on-surface-variant font-mono text-[10px] font-semibold uppercase hover:text-on-surface transition-all" type="button">Pro</button>
+      </div>
+    </div>
+  </div>
+</header>
 
-function renderQueue(list) {
-  const container = document.getElementById('queue-list');
-  const empty = document.getElementById('queue-empty');
-  document.getElementById('queue-count').textContent = list.length;
+<main class="flex-1 w-full pt-20 pb-24 px-4">
 
-  if (!list.length) {
-    container.innerHTML = '';
-    empty.classList.remove('hidden');
-    return;
-  }
-  empty.classList.add('hidden');
+  <div id="loading" class="flex items-center justify-center py-20">
+    <span class="material-symbols-outlined text-primary text-3xl spinner">sync</span>
+  </div>
 
-  container.innerHTML = list.map((s, i) => {
-    const cashPending = s.isUberStats && s.cashPending;
-    const cardColor = s.platform === 'Bolt' ? 'bg-primary-fixed' : 'bg-secondary-container';
+  <div id="error-box" class="hidden bg-error-container text-on-error-container rounded-xl p-4">
+    <div class="font-semibold mb-1">Ошибка</div>
+    <div id="error-msg" class="text-sm"></div>
+  </div>
 
-    let cashBlock = '';
-    if (s.isUberStats) {
-      if (cashPending) {
-        cashBlock = `
-          <div class="mt-3 bg-surface-container-lowest rounded-lg p-3">
-            <div class="font-mono text-[10px] text-tertiary uppercase mb-2">💵 Наличные за период Uber?</div>
-            <div class="flex gap-2">
-              <input id="cash-${i}" type="number" step="0.01" value="0" inputmode="decimal" class="flex-1 bg-surface-container-high text-on-surface font-mono text-sm px-3 py-2 rounded-lg focus:outline-none">
-              <button onclick="setCash(${i})" class="px-4 py-2 rounded-lg bg-primary text-on-primary font-mono text-xs font-semibold">OK</button>
-            </div>
-          </div>`;
-      } else {
-        cashBlock = `<div class="mt-2 font-mono text-[10px] text-on-surface-variant">Нал: ${fmt(s.cash)}</div>`;
-      }
-    }
+  <section id="tab-dashboard" class="hidden flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-headline text-xl font-semibold">Обзор</h2>
+      <span id="dash-total" class="font-mono text-[10px] text-on-surface-variant">Всего: 0 недель</span>
+    </div>
 
-    return `
-      <div class="bg-surface-container rounded-xl p-4 border border-white/5 relative overflow-hidden">
-        <div class="absolute left-0 top-0 bottom-0 w-1 ${cardColor}"></div>
-        <div class="flex items-start justify-between gap-2 pl-2">
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
-              <span class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] font-bold">${esc(s.platform)}</span>
-              <span class="font-mono text-[10px] text-on-surface-variant">${esc(s.dateRange || '—')}</span>
-            </div>
-            <div class="mt-2 grid grid-cols-2 gap-2 font-mono text-xs">
-              <div><span class="text-on-surface-variant">Брутто:</span> <span class="font-semibold">${fmt(s.gross)}</span></div>
-              <div><span class="text-on-surface-variant">Нетто:</span> <span class="font-semibold text-primary">${fmt(s.net)}</span></div>
-              <div><span class="text-on-surface-variant">Нал:</span> <span class="text-tertiary font-semibold">${fmt(s.cash)}</span></div>
-              <div><span class="text-on-surface-variant">Бонусы:</span> <span>${fmt(s.bonuses)}</span></div>
-            </div>
-            ${cashBlock}
-          </div>
-          <button onclick="removeScreen(${i})" class="p-2 rounded-lg bg-surface-container-high hover:bg-error/20 text-error shrink-0">
-            <span class="material-symbols-outlined text-base">delete</span>
-          </button>
+    <div id="dash-last-empty" class="hidden bg-surface-container-low rounded-xl p-6 text-center">
+      <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">inbox</span>
+      <p class="text-on-surface-variant">Пока нет отчётов</p>
+      <button onclick="switchTab('calculator')" class="mt-3 px-4 py-2 rounded-lg bg-primary text-on-primary font-mono font-semibold">Перейти к расчёту</button>
+    </div>
+
+    <div id="dash-last" class="hidden flex-col gap-4">
+      <div class="bg-surface-container-high rounded-xl p-4 flex flex-col gap-3">
+        <div class="flex items-center justify-between">
+          <span id="dash-period" class="font-mono text-[11px] text-on-surface-variant uppercase">—</span>
+          <span id="dash-platform" class="px-2 py-0.5 rounded-full bg-surface-container font-mono text-[10px] text-primary">—</span>
         </div>
-      </div>`;
-  }).join('');
-}
+        <div class="flex items-baseline justify-between">
+          <div>
+            <div class="font-mono text-[10px] text-on-surface-variant uppercase">На руки</div>
+            <div id="dash-net-cash" class="font-mono text-2xl font-bold text-primary">0,00 zł</div>
+          </div>
+          <div class="text-right">
+            <div class="font-mono text-[10px] text-on-surface-variant uppercase">Профит</div>
+            <div id="dash-net-full" class="font-mono text-xl font-bold text-secondary">0,00 zł</div>
+          </div>
+        </div>
+      </div>
 
-async function removeScreen(index) {
-  hideError();
-  const data = await apiPost('removeScreenshot', { index });
-  if (!data.ok) return showError(data.error || 'remove_failed');
-  loadQueue();
-}
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-surface-container-low rounded-xl p-3">
+          <div class="font-mono text-[10px] text-on-surface-variant uppercase">Брутто</div>
+          <div id="dash-gross" class="font-mono text-base font-bold">0,00 zł</div>
+        </div>
+        <div class="bg-surface-container-low rounded-xl p-3">
+          <div class="font-mono text-[10px] text-on-surface-variant uppercase">Карта</div>
+          <div id="dash-card" class="font-mono text-base font-bold text-secondary">0,00 zł</div>
+        </div>
+        <div class="bg-surface-container-low rounded-xl p-3">
+          <div class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</div>
+          <div id="dash-fuel" class="font-mono text-base font-bold text-error">0,00 zł</div>
+        </div>
+        <div class="bg-surface-container-low rounded-xl p-3">
+          <div class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</div>
+          <div id="dash-km" class="font-mono text-base font-bold">0 км</div>
+        </div>
+      </div>
 
-async function setCash(index) {
-  hideError();
-  const el = document.getElementById('cash-' + index);
-  const val = el ? (parseFloat(el.value) || 0) : 0;
-  if (val < 0) return showError('Наличные не могут быть отрицательными');
-  const data = await apiPost('updateCash', { index, cash: val });
-  if (!data.ok) return showError(data.error || 'update_failed');
-  loadQueue();
-}
+      <div class="bg-surface-container rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <span class="font-headline text-sm font-semibold">Последние 8 недель</span>
+          <span class="font-mono text-[10px] text-on-surface-variant">на руки, PLN</span>
+        </div>
+        <div id="dash-sparkline" class="h-20 flex items-end gap-1"></div>
+      </div>
 
-// === Upload ===
-document.getElementById('file-input').addEventListener('change', async (e) => {
-  const files = Array.from(e.target.files || []);
-  if (!files.length) return;
+      <div class="bg-surface-container-low rounded-xl p-4">
+        <div class="font-headline text-sm font-semibold mb-3">Итого за 4 недели</div>
+        <div class="flex flex-col gap-2 font-mono text-sm">
+          <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="sum4-card" class="font-semibold">0,00 zł</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="sum4-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">💰 На руки:</span><span id="sum4-net" class="font-semibold text-primary">0,00 zł</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="sum4-fuel" class="font-semibold">0,00 zł</span></div>
+          <div class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="sum4-full" class="font-semibold text-secondary">0,00 zł</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  const status = document.getElementById('upload-status');
-  status.classList.remove('hidden');
-  status.textContent = `Загрузка ${files.length} файл(ов)...`;
+  <section id="tab-screenshots" class="hidden flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-headline text-xl font-semibold">Очередь скринов</h2>
+      <span id="queue-count" class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] text-primary">0</span>
+    </div>
 
-  for (const file of files) {
-    try {
-      const base64 = await fileToBase64Compressed(file);
-      const data = await apiPost('uploadScreenshot', { base64, filename: file.name });
-      if (!data.ok) {
-        const reason = data.error === 'pending_cash'
-          ? 'сначала укажите наличные Uber'
-          : (data.error || 'ошибка');
-        status.textContent = `❌ ${file.name}: ${reason}`;
-      } else {
-        status.textContent = `✅ ${file.name}: распознан (${data.parsed.platform})`;
-      }
-    } catch (err) {
-      status.textContent = `❌ ${file.name}: ${err.message}`;
-    }
-  }
-  e.target.value = '';
-  setTimeout(() => status.classList.add('hidden'), 3000);
-  loadQueue();
-});
+    <label for="file-input" id="drop-zone" class="cursor-pointer bg-surface-container border-2 border-dashed border-outline-variant hover:border-primary/40 rounded-xl p-6 flex flex-col items-center gap-2 transition-all">
+      <span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
+      <div class="font-headline text-base font-semibold">Загрузить скриншоты</div>
+      <div class="font-mono text-[10px] text-on-surface-variant">PNG, JPG • один или несколько</div>
+      <input id="file-input" type="file" accept="image/*" multiple class="hidden">
+    </label>
 
-function fileToBase64Compressed(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 2000;
-        let w = img.width, h = img.height;
-        if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
-        const canvas = document.createElement('canvas');
-        canvas.width = w; canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, w, h);
-        ctx.drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.92));
-      };
-      img.onerror = () => reject(new Error('image_load_failed'));
-      img.src = ev.target.result;
-    };
-    reader.onerror = () => reject(new Error('file_read_failed'));
-    reader.readAsDataURL(file);
-  });
-}
+    <div id="upload-status" class="hidden rounded-lg bg-surface-container-low p-3 font-mono text-xs"></div>
 
-// === Calculator ===
-let calcDefaults = null;
+    <div id="queue-list" class="flex flex-col gap-3"></div>
 
-async function loadCalcDefaults() {
-  hideError();
-  try {
-    const data = await apiGet('settings');
-    if (!data.ok) return showError(data.error || 'settings_failed');
-    calcDefaults = data.settings;
+    <div id="queue-empty" class="hidden text-center text-on-surface-variant py-8">
+      <span class="material-symbols-outlined text-4xl mb-2">inbox</span>
+      <p>Очередь пуста. Загрузите скриншоты от Uber / Bolt.</p>
+    </div>
+  </section>
 
-    document.getElementById('in-dep-rate').value = calcDefaults.depRate;
+  <section id="tab-calculator" class="hidden flex-col gap-4">
+    <div class="flex items-center justify-between">
+      <h2 class="font-headline text-xl font-semibold">Расчёт недели</h2>
+      <button onclick="loadCalcDefaults()" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
+    </div>
 
-    // Автоподстановка сумм из очереди
-    try {
-      const q = await apiGet('queue');
-      if (q.ok && q.screenshots && q.screenshots.length) {
-        const totalGross   = q.screenshots.reduce((a, s) => a + (Number(s.gross)   || 0), 0);
-        const totalNet     = q.screenshots.reduce((a, s) => a + (Number(s.net)     || 0), 0);
-        const totalCash    = q.screenshots.reduce((a, s) => a + (Number(s.cash)    || 0), 0);
-        const totalBonuses = q.screenshots.reduce((a, s) => a + (Number(s.bonuses) || 0), 0);
+    <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
+      <div>
+        <div class="font-mono text-[10px] text-on-surface-variant uppercase">Реальный профит</div>
+        <div id="calc-hero-net" class="font-mono text-2xl font-bold text-primary">0,00 zł</div>
+      </div>
+      <div class="text-right">
+        <div class="font-mono text-[10px] text-on-surface-variant uppercase">На карту</div>
+        <div id="calc-hero-card" class="font-mono text-base font-bold text-secondary">0,00 zł</div>
+      </div>
+    </div>
 
-        document.getElementById('in-gross').value = totalGross.toFixed(2);
-        document.getElementById('in-net').value   = totalNet.toFixed(2);
-        document.getElementById('in-cash').value  = totalCash.toFixed(2);
+    <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Брутто (из скринов)</label>
+        <div class="relative">
+          <input id="in-gross" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+        </div>
+      </div>
 
-        const promoEl = document.getElementById('in-promo-base');
-        if (promoEl && !Number(promoEl.value)) promoEl.value = totalBonuses.toFixed(2);
-      }
-    } catch (_) {}
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Нетто (из скринов)</label>
+        <div class="relative">
+          <input id="in-net" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+        </div>
+      </div>
 
-    recalc();
-  } catch (err) { showError('Settings: ' + err.message); }
-}
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</label>
+        <div class="relative">
+          <input id="in-km" type="number" step="1" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">км</span>
+        </div>
+      </div>
 
-function recalc() {
-  const gross      = parseFloat(document.getElementById('in-gross').value) || 0;
-  const net        = parseFloat(document.getElementById('in-net').value)   || 0;
-  const km         = parseFloat(document.getElementById('in-km').value)    || 0;
-  const fuel       = parseFloat(document.getElementById('in-fuel').value)  || 0;
-  const cash       = parseFloat(document.getElementById('in-cash').value)  || 0;
-  const promoBase  = parseFloat(document.getElementById('in-promo-base').value) || 0;
-  const depRate    = parseFloat(document.getElementById('in-dep-rate').value) || 0;
-  const includeZus = document.getElementById('in-zus-toggle').checked;
-  const includeFuel = document.getElementById('in-fuel-toggle').checked;
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</label>
+        <div class="relative">
+          <input id="in-fuel" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+        </div>
+        <label class="flex items-center gap-2 mt-1 cursor-pointer">
+          <input id="in-fuel-toggle" type="checkbox" checked class="accent-primary">
+          <span class="font-mono text-[10px] text-on-surface-variant">Вычесть из прибыли</span>
+        </label>
+      </div>
 
-  if (!calcDefaults) return;
-  const s = calcDefaults;
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Наличные (из скринов)</label>
+        <div class="relative">
+          <input id="in-cash" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+        </div>
+      </div>
 
-  // === Формулы 1-в-1 как в bot.gs (buildLiteReport / buildReportRow) ===
-  const partnerBaseAmount = s.partnerBase === 'net' ? net : gross;
-  const partnerVat = partnerBaseAmount * s.partnerPct;
-  const promoTax   = promoBase * s.promoTaxPct;
-  const zus        = includeZus ? s.zus : 0;
-  const dep        = km * depRate;
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">База налога на бонус (из сообщения партнёра)</label>
+        <div class="relative">
+          <input id="in-promo-base" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+        </div>
+      </div>
 
-  const cardPayout = net - cash - partnerVat - promoTax - s.weeklyFee - zus;
-  const fuelCost   = includeFuel ? fuel : 0;
-  const netCash    = cardPayout + cash;
-  const netFuel    = netCash - fuelCost;
-  const netFull    = netCash - dep;
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Ставка амортизации</label>
+        <div class="relative">
+          <input id="in-dep-rate" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0.50" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł/км</span>
+        </div>
+      </div>
 
-  document.getElementById('p-gross').textContent    = fmt(gross);
-  document.getElementById('p-net-input').textContent = fmt(net);
-  document.getElementById('p-vat').textContent      = '-' + fmt(partnerVat);
-  document.getElementById('p-bonustax').textContent = '-' + fmt(promoTax);
-  document.getElementById('p-fee').textContent      = '-' + fmt(s.weeklyFee);
-  document.getElementById('p-zus').textContent      = '-' + fmt(zus);
-  document.getElementById('p-cash').textContent     = '-' + fmt(cash);
-  document.getElementById('p-card').textContent     = fmt(cardPayout);
-  document.getElementById('p-fuel').textContent     = '-' + fmt(fuelCost);
-  document.getElementById('p-dep').textContent      = '-' + fmt(dep);
-  document.getElementById('p-net').textContent      = fmt(netFull);
-  document.getElementById('calc-hero-net').textContent  = fmt(netFull);
-  document.getElementById('calc-hero-card').textContent = fmt(cardPayout);
-}
+      <label class="flex items-center justify-between bg-surface-container rounded-lg p-3 cursor-pointer">
+        <span class="font-body text-sm">Вычесть ZUS</span>
+        <input id="in-zus-toggle" type="checkbox" checked class="accent-primary w-5 h-5">
+      </label>
+    </div>
 
-['in-km','in-fuel','in-promo-base','in-dep-rate','in-zus-toggle','in-fuel-toggle']
-  .forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('input', recalc);
-  });
+    <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2 font-mono text-sm">
+      <div class="flex justify-between"><span class="text-on-surface-variant">Брутто:</span><span id="p-gross" class="font-semibold">0,00 zł</span></div>
+      <div class="flex justify-between"><span class="text-on-surface-variant">Нетто:</span><span id="p-net-input" class="font-semibold">0,00 zł</span></div>
+      <div class="flex justify-between"><span class="text-on-surface-variant">Партнёрка:</span><span id="p-vat" class="text-error">0,00 zł</span></div>
+      <div class="flex justify-between"><span class="text-on-surface-variant">Налог на бонус:</span><span id="p-bonustax" class="text-error">0,00 zł</span></div>
+      <div class="flex justify-between"><span class="text-on-surface-variant">Недельная комиссия:</span><span id="p-fee" class="text-error">0,00 zł</span></div>
+      <div class="flex justify-between"><span class="text-on-surface-variant">ZUS:</span><span id="p-zus" class="text-error">0,00 zł</span></div>
+      <div class="flex justify-between"><span class="text-on-surface-variant">Наличные:</span><span id="p-cash" class="text-tertiary">0,00 zł</span></div>
+      <div class="flex justify-between bg-surface-container-high rounded-lg p-2 mt-1">
+        <span class="text-secondary">💳 К выплате на карту:</span>
+        <span id="p-card" class="text-secondary font-bold">0,00 zł</span>
+      </div>
+      <div class="flex justify-between mt-2"><span class="text-on-surface-variant">Топливо:</span><span id="p-fuel" class="text-error">0,00 zł</span></div>
+      <div class="flex justify-between"><span class="text-on-surface-variant">Амортизация:</span><span id="p-dep" class="text-error">0,00 zł</span></div>
+      <div class="flex justify-between bg-surface-container-lowest rounded-lg p-3 mt-2">
+        <span class="font-headline text-sm">Реальный профит:</span>
+        <span id="p-net" class="font-mono text-xl font-bold text-primary">0,00 zł</span>
+      </div>
+    </div>
 
-async function saveReport() {
-  hideError();
-  try {
-    const queueData = await apiGet('queue');
-    if (!queueData.ok) return toast('❌ ' + (queueData.error || 'queue_failed'));
-    if (!queueData.screenshots || !queueData.screenshots.length) {
-      return toast('❌ Загрузите скрины');
-    }
-    if (queueData.hasPendingCash) {
-      return toast('❌ Сначала укажите наличные Uber');
-    }
+    <button onclick="saveReport()" class="w-full h-12 rounded-xl bg-primary hover:bg-primary-fixed text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+      <span class="material-symbols-outlined">save</span>
+      Сохранить в Google Таблицу
+    </button>
 
-    const params = {
-      screenshots: queueData.screenshots,
-      km:    parseFloat(document.getElementById('in-km').value) || 0,
-      fuel:  parseFloat(document.getElementById('in-fuel').value) || 0,
-      depRate: parseFloat(document.getElementById('in-dep-rate').value) || 0,
-      promoBonusBase: parseFloat(document.getElementById('in-promo-base').value) || 0,
-      includeZus: document.getElementById('in-zus-toggle').checked,
-      includeFuel: document.getElementById('in-fuel-toggle').checked
-    };
+    <div id="save-toast" class="hidden fixed bottom-24 left-4 right-4 bg-surface-container-highest text-on-surface p-4 rounded-xl shadow-2xl flex items-center gap-3 z-50">
+      <span class="material-symbols-outlined text-primary">cloud_done</span>
+      <div class="flex-1 font-mono text-sm">Отчёт сохранён!</div>
+    </div>
+  </section>
 
-    const data = await apiPost('saveReport', { params });
-    if (!data.ok) return toast('❌ ' + (data.error || 'save_failed'));
-    toast('✅ Отчёт сохранён!');
-    setTimeout(() => switchTab('dashboard'), 800);
-  } catch (err) {
-    toast('❌ ' + err.message);
-  }
-}
+  <section id="tab-settings" class="hidden flex-col gap-4">
+    <h2 class="font-headline text-xl font-semibold">Настройки</h2>
 
-// === Settings ===
-async function loadSettings() {
-  hideError();
-  try {
-    const data = await apiGet('settings');
-    if (!data.ok) return showError(data.error || 'settings_failed');
-    const s = data.settings;
+    <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Режим</label>
+        <div class="bg-surface-container-high rounded-full p-0.5 flex">
+          <button id="set-lite" class="flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all">Lite</button>
+          <button id="set-pro"  class="flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all">Pro</button>
+        </div>
+      </div>
 
-    document.getElementById('set-partner-pct').value = (s.partnerPct * 100).toFixed(2);
-    document.getElementById('set-promo-tax').value   = (s.promoTaxPct * 100).toFixed(2);
-    document.getElementById('set-weekly-fee').value  = s.weeklyFee;
-    document.getElementById('set-zus').value         = s.zus;
-    document.getElementById('set-dep-rate').value    = s.depRate;
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Партнёрка %</label>
+        <input id="set-partner-pct" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="5" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+      </div>
 
-    setActiveMode(s.mode);
-    setActiveBase(s.partnerBase);
-    calcDefaults = s;
-  } catch (err) { showError('Settings: ' + err.message); }
-}
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">База партнёрки</label>
+        <div class="bg-surface-container-high rounded-full p-0.5 flex">
+          <button id="set-base-gross" class="flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all">gross</button>
+          <button id="set-base-net"   class="flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all">net</button>
+        </div>
+      </div>
 
-async function saveSettings() {
-  hideError();
-  const settings = {
-    partnerPct:  (parseFloat(document.getElementById('set-partner-pct').value) || 0) / 100,
-    promoTaxPct: (parseFloat(document.getElementById('set-promo-tax').value) || 0) / 100,
-    weeklyFee:   parseFloat(document.getElementById('set-weekly-fee').value) || 0,
-    zus:         parseFloat(document.getElementById('set-zus').value) || 0,
-    depRate:     parseFloat(document.getElementById('set-dep-rate').value) || 0,
-    partnerBase: currentBase,
-    mode:        currentMode
-  };
-  const data = await apiPost('saveSettings', { settings });
-  if (data.ok) {
-    toast('✅ Настройки сохранены');
-    calcDefaults = data.settings;
-  } else {
-    toast('❌ ' + (data.error || 'save_failed'));
-  }
-}
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Налог на бонусы %</label>
+        <input id="set-promo-tax" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="23" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+      </div>
 
-async function resetSettings() {
-  const defaults = {
-    partnerPct: 0.05, partnerBase: 'gross', promoTaxPct: 0.23,
-    weeklyFee: 60, zus: 350, depRate: 0.50, mode: 'lite'
-  };
-  const data = await apiPost('saveSettings', { settings: defaults });
-  if (data.ok) {
-    toast('✅ Сброшено');
-    calcDefaults = data.settings;
-    loadSettings();
-  } else {
-    toast('❌ ' + (data.error || 'reset_failed'));
-  }
-}
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Недельная комиссия партнёра (PLN)</label>
+        <input id="set-weekly-fee" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="60" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+      </div>
 
-// === Mode / Base toggle ===
-let currentMode = 'lite';
-let currentBase = 'gross';
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">ZUS (PLN)</label>
+        <input id="set-zus" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="350" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+      </div>
 
-function setActiveMode(mode) {
-  currentMode = mode;
-  const lite = document.getElementById('set-lite');
-  const pro  = document.getElementById('set-pro');
-  const hLite = document.getElementById('hdr-lite');
-  const hPro  = document.getElementById('hdr-pro');
+      <div class="flex flex-col gap-1">
+        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Амортизация (PLN/км)</label>
+        <input id="set-dep-rate" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0.50" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+      </div>
+    </div>
 
-  const onSet  = 'flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all bg-primary text-on-primary';
-  const offSet = 'flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all text-on-surface-variant';
-  const onHdr  = 'px-2 py-1 rounded-full bg-primary text-on-primary font-mono text-[10px] font-bold uppercase transition-all';
-  const offHdr = 'px-2 py-1 rounded-full text-on-surface-variant font-mono text-[10px] font-semibold uppercase hover:text-on-surface transition-all';
+    <button onclick="saveSettings()" class="w-full h-12 rounded-xl bg-primary text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98]">
+      <span class="material-symbols-outlined">save</span>
+      Сохранить настройки
+    </button>
 
-  if (lite && pro) {
-    lite.className = mode === 'lite' ? onSet : offSet;
-    pro.className  = mode === 'pro'  ? onSet : offSet;
-  }
-  if (hLite && hPro) {
-    hLite.className = mode === 'lite' ? onHdr : offHdr;
-    hPro.className  = mode === 'pro'  ? onHdr : offHdr;
-  }
-}
+    <button onclick="resetSettings()" class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2">
+      <span class="material-symbols-outlined text-base">restart_alt</span>
+      Сбросить к дефолту
+    </button>
+  </section>
 
-function setActiveBase(base) {
-  currentBase = base;
-  const g = document.getElementById('set-base-gross');
-  const n = document.getElementById('set-base-net');
-  if (!g || !n) return;
-  const on  = 'flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all bg-primary text-on-primary';
-  const off = 'flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all text-on-surface-variant';
-  g.className = base === 'gross' ? on : off;
-  n.className = base === 'net'   ? on : off;
-}
+</main>
 
-document.getElementById('set-lite').addEventListener('click', async () => {
-  setActiveMode('lite');
-  const r = await apiPost('saveSettings', { settings: { mode: 'lite' } });
-  if (r.ok) calcDefaults = r.settings;
-});
-document.getElementById('set-pro').addEventListener('click', async () => {
-  setActiveMode('pro');
-  const r = await apiPost('saveSettings', { settings: { mode: 'pro' } });
-  if (r.ok) calcDefaults = r.settings;
-});
-document.getElementById('set-base-gross').addEventListener('click', async () => {
-  setActiveBase('gross');
-  const r = await apiPost('saveSettings', { settings: { partnerBase: 'gross' } });
-  if (r.ok) calcDefaults = r.settings;
-});
-document.getElementById('set-base-net').addEventListener('click', async () => {
-  setActiveBase('net');
-  const r = await apiPost('saveSettings', { settings: { partnerBase: 'net' } });
-  if (r.ok) calcDefaults = r.settings;
-});
+<nav class="fixed bottom-0 inset-x-0 z-50 pb-safe bg-surface-container-lowest/90 backdrop-blur-xl shadow-[0_-4px_20px_rgba(0,0,0,0.4)]">
+  <div class="flex justify-around items-center h-20 px-2">
+    <button onclick="switchTab('dashboard')"   data-tab="dashboard"   class="tab-btn flex flex-col items-center justify-center gap-1 w-16 h-14 text-on-surface-variant transition-colors">
+      <span class="material-symbols-outlined text-[22px]">dashboard</span>
+      <span class="font-mono text-[10px]">Обзор</span>
+    </button>
+    <button onclick="switchTab('screenshots')" data-tab="screenshots" class="tab-btn flex flex-col items-center justify-center gap-1 w-16 h-14 text-on-surface-variant transition-colors">
+      <span class="material-symbols-outlined text-[22px]">document_scanner</span>
+      <span class="font-mono text-[10px]">Скрины</span>
+    </button>
+    <button onclick="switchTab('calculator')"  data-tab="calculator"  class="tab-btn flex flex-col items-center justify-center gap-1 w-16 h-14 text-on-surface-variant transition-colors">
+      <span class="material-symbols-outlined text-[22px]">calculate</span>
+      <span class="font-mono text-[10px]">Расчёт</span>
+    </button>
+    <button onclick="switchTab('settings')"    data-tab="settings"    class="tab-btn flex flex-col items-center justify-center gap-1 w-16 h-14 text-on-surface-variant transition-colors">
+      <span class="material-symbols-outlined text-[22px]">tune</span>
+      <span class="font-mono text-[10px]">Настройки</span>
+    </button>
+  </div>
+</nav>
 
-document.getElementById('hdr-lite').addEventListener('click', async () => {
-  setActiveMode('lite');
-  const r = await apiPost('saveSettings', { settings: { mode: 'lite' } });
-  if (r.ok) calcDefaults = r.settings;
-});
-document.getElementById('hdr-pro').addEventListener('click', async () => {
-  setActiveMode('pro');
-  const r = await apiPost('saveSettings', { settings: { mode: 'pro' } });
-  if (r.ok) calcDefaults = r.settings;
-});
-
-// === Init ===
-window.addEventListener('DOMContentLoaded', async () => {
-  if (tg) {
-    tg.ready();
-    tg.expand();
-    tg.setHeaderColor && tg.setHeaderColor('#10141a');
-    tg.setBackgroundColor && tg.setBackgroundColor('#10141a');
-  }
-
-  if (!initData) {
-    hideLoading();
-    showError('Откройте приложение через Telegram-бота');
-    return;
-  }
-
-  try {
-    const auth = await apiGet('verify');
-    if (!auth.ok) {
-      hideLoading();
-      return showError('Авторизация не прошла: ' + (auth.reason || auth.error));
-    }
-  } catch (err) {
-    hideLoading();
-    return showError('Не удалось подключиться к API: ' + err.message);
-  }
-
-  switchTab('dashboard');
-});
+<script src="app.js"></script>
+</body>
+</html>
