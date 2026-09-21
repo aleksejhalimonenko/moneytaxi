@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   MoneyTaxi WebApp — frontend logic (fixed)
+   MoneyTaxi WebApp — frontend logic (final, синхр. с v23-ботом)
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbx_h3-mJ4KXRAa64vJlGy70rpM516QQX_ILf5qoH9A9x-7b5-b6gPrkh4GuTuKL5f5f/exec';
@@ -56,18 +56,26 @@ function hideLoading() {
 
 // === API-запросы ===
 async function apiGet(action, params = {}) {
-  const qs = new URLSearchParams({ action, initData, ...params });
-  const res = await fetch(`${API_URL}?${qs.toString()}`);
-  return res.json();
+  try {
+    const qs = new URLSearchParams({ action, initData, ...params });
+    const res = await fetch(`${API_URL}?${qs.toString()}`);
+    return await res.json();
+  } catch (err) {
+    return { ok: false, error: 'network', message: err.message };
+  }
 }
 
 async function apiPost(action, payload = {}) {
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // обход CORS preflight
-    body: JSON.stringify({ action, initData, ...payload })
-  });
-  return res.json();
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, initData, ...payload })
+    });
+    return await res.json();
+  } catch (err) {
+    return { ok: false, error: 'network', message: err.message };
+  }
 }
 
 // === Tab Switching ===
@@ -102,10 +110,7 @@ async function loadDashboard() {
   hideError();
   try {
     const data = await apiGet('dashboard');
-    if (!data.ok) {
-      showError(data.error || 'dashboard_failed');
-      return;
-    }
+    if (!data.ok) { showError(data.error || 'dashboard_failed'); return; }
 
     if (data.empty) {
       document.getElementById('dash-last-empty').classList.remove('hidden');
@@ -130,7 +135,6 @@ async function loadDashboard() {
     document.getElementById('dash-km').textContent       = (w.km || 0) + ' км';
     document.getElementById('dash-total').textContent    = 'Всего: ' + (data.totalReports || 0) + ' недель';
 
-    // Sparkline (8 недель)
     const spark = data.sparkline || [];
     const container = document.getElementById('dash-sparkline');
     if (spark.length === 0) {
@@ -144,7 +148,6 @@ async function loadDashboard() {
       }).join('');
     }
 
-    // Summary 4 weeks
     const s4 = data.summary4 || {};
     document.getElementById('sum4-card').textContent = fmt(s4.card);
     document.getElementById('sum4-cash').textContent = fmt(s4.cash);
@@ -163,10 +166,7 @@ async function loadQueue() {
   hideError();
   try {
     const data = await apiGet('queue');
-    if (!data.ok) {
-      showError(data.error || 'queue_failed');
-      return;
-    }
+    if (!data.ok) { showError(data.error || 'queue_failed'); return; }
     renderQueue(data.screenshots || []);
   } catch (err) {
     showError('Queue: ' + err.message);
@@ -241,6 +241,7 @@ async function setCash(index) {
   hideError();
   const el = document.getElementById('cash-' + index);
   const val = el ? (parseFloat(el.value) || 0) : 0;
+  if (val < 0) return showError('Наличные не могут быть отрицательными');
   const data = await apiPost('updateCash', { index, cash: val });
   if (!data.ok) return showError(data.error || 'update_failed');
   loadQueue();
@@ -304,6 +305,7 @@ function fileToBase64Compressed(file) {
 
 // === Calculator ===
 let calcDefaults = null;
+let queueTotals = { gross: 0, net: 0, cash: 0, bonuses: 0 };
 
 async function loadCalcDefaults() {
   hideError();
@@ -314,16 +316,26 @@ async function loadCalcDefaults() {
 
     document.getElementById('in-dep-rate').value = calcDefaults.depRate;
 
-    // Автозаполнение из очереди — если есть скрины, подставим gross/cash
+    // Автоподстановка сумм из очереди
     try {
       const q = await apiGet('queue');
       if (q.ok && q.screenshots && q.screenshots.length) {
-        const totalGross = q.screenshots.reduce((a, s) => a + (Number(s.gross) || 0), 0);
-        const totalCash  = q.screenshots.reduce((a, s) => a + (Number(s.cash)  || 0), 0);
+        queueTotals = {
+          gross:   q.screenshots.reduce((a, s) => a + (Number(s.gross)   || 0), 0),
+          net:     q.screenshots.reduce((a, s) => a + (Number(s.net)     || 0), 0),
+          cash:    q.screenshots.reduce((a, s) => a + (Number(s.cash)    || 0), 0),
+          bonuses: q.screenshots.reduce((a, s) => a + (Number(s.bonuses) || 0), 0)
+        };
+
         const grossEl = document.getElementById('in-gross');
         const cashEl  = document.getElementById('in-cash');
-        if (grossEl && !Number(grossEl.value)) grossEl.value = totalGross.toFixed(2);
-        if (cashEl  && !Number(cashEl.value))  cashEl.value  = totalCash.toFixed(2);
+        if (grossEl) grossEl.value = queueTotals.gross.toFixed(2);
+        if (cashEl)  cashEl.value  = queueTotals.cash.toFixed(2);
+
+        const promoEl = document.getElementById('in-promo-base');
+        if (promoEl && !Number(promoEl.value)) promoEl.value = queueTotals.bonuses.toFixed(2);
+      } else {
+        queueTotals = { gross: 0, net: 0, cash: 0, bonuses: 0 };
       }
     } catch (_) {}
 
@@ -332,29 +344,30 @@ async function loadCalcDefaults() {
 }
 
 function recalc() {
-  const gross        = parseFloat(document.getElementById('in-gross').value) || 0;
-  const km           = parseFloat(document.getElementById('in-km').value) || 0;
-  const fuel         = parseFloat(document.getElementById('in-fuel').value) || 0;
-  const cash         = parseFloat(document.getElementById('in-cash').value) || 0;
-  const promoBase    = parseFloat(document.getElementById('in-promo-base').value) || 0;
-  const depRate      = parseFloat(document.getElementById('in-dep-rate').value) || 0;
-  const includeZus   = document.getElementById('in-zus-toggle').checked;
-  const includeFuel  = document.getElementById('in-fuel-toggle').checked;
+  const gross      = parseFloat(document.getElementById('in-gross').value) || 0;
+  const km         = parseFloat(document.getElementById('in-km').value)    || 0;
+  const fuel       = parseFloat(document.getElementById('in-fuel').value)  || 0;
+  const cash       = parseFloat(document.getElementById('in-cash').value)  || 0;
+  const promoBase  = parseFloat(document.getElementById('in-promo-base').value) || 0;
+  const depRate    = parseFloat(document.getElementById('in-dep-rate').value) || 0;
+  const includeZus = document.getElementById('in-zus-toggle').checked;
+  const includeFuel = document.getElementById('in-fuel-toggle').checked;
 
   if (!calcDefaults) return;
-
   const s = calcDefaults;
 
-  // ─── Синхронизировано с apiCalculate на бэкенде ───
-  // partnerBase = 'net' → база = (gross - cash). Иначе — gross.
-  const partnerBaseAmt = s.partnerBase === 'net' ? (gross - cash) : gross;
-  const partnerVat     = partnerBaseAmt * s.partnerPct;
-  const promoTax       = promoBase * s.promoTaxPct;
-  const zus            = includeZus ? s.zus : 0;
-  const dep            = km * depRate;
+  // ─── Синхронизировано с bot.gs (buildLiteReport / buildReportRow) ───
+  // net = сумма net со всех скринов (как на бэке)
+  const net = queueTotals.net || 0;
 
-  // Формула cardPayout совпадает с бэкендом (от gross, т.к. на форме нет net)
-  const cardPayout = gross - partnerVat - promoTax - s.weeklyFee - zus - cash;
+  const partnerBaseAmount = s.partnerBase === 'net' ? net : gross;
+  const partnerVat = partnerBaseAmount * s.partnerPct;
+  const promoTax   = promoBase * s.promoTaxPct;
+  const zus        = includeZus ? s.zus : 0;
+  const dep        = km * depRate;
+
+  // Формула 1-в-1 как в bot.gs
+  const cardPayout = net - cash - partnerVat - promoTax - s.weeklyFee - zus;
   const fuelCost   = includeFuel ? fuel : 0;
   const netCash    = cardPayout + cash;
   const netFuel    = netCash - fuelCost;
@@ -392,16 +405,11 @@ async function saveReport() {
       return toast('❌ Сначала укажите наличные Uber');
     }
 
-    const gross = parseFloat(document.getElementById('in-gross').value) || 0;
-    const cash  = parseFloat(document.getElementById('in-cash').value) || 0;
-
+    // НЕ передаём gross/net/cash из формы — бэк сам возьмёт их из screenshots
     const params = {
       screenshots: queueData.screenshots,
-      gross: gross,
-      net: gross - cash,   // ← добавить
       km:    parseFloat(document.getElementById('in-km').value) || 0,
       fuel:  parseFloat(document.getElementById('in-fuel').value) || 0,
-      cash:  cash,
       depRate: parseFloat(document.getElementById('in-dep-rate').value) || 0,
       promoBonusBase: parseFloat(document.getElementById('in-promo-base').value) || 0,
       includeZus: document.getElementById('in-zus-toggle').checked,
@@ -433,8 +441,6 @@ async function loadSettings() {
 
     setActiveMode(s.mode);
     setActiveBase(s.partnerBase);
-
-    // Обновим локальный кэш для калькулятора
     calcDefaults = s;
   } catch (err) { showError('Settings: ' + err.message); }
 }
@@ -481,27 +487,23 @@ let currentBase = 'gross';
 function setActiveMode(mode) {
   currentMode = mode;
 
-  // Кнопки в табе Settings
   const lite = document.getElementById('set-lite');
   const pro  = document.getElementById('set-pro');
-
-  // Кнопки в хедере
   const hLite = document.getElementById('hdr-lite');
   const hPro  = document.getElementById('hdr-pro');
 
   const onSet  = 'flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all bg-primary text-on-primary';
   const offSet = 'flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all text-on-surface-variant';
-
   const onHdr  = 'px-2 py-1 rounded-full bg-primary text-on-primary font-mono text-[10px] font-bold uppercase transition-all';
   const offHdr = 'px-2 py-1 rounded-full text-on-surface-variant font-mono text-[10px] font-semibold uppercase hover:text-on-surface transition-all';
 
   if (lite && pro) {
-    lite.className = mode === 'lite' ? onSet  : offSet;
-    pro.className  = mode === 'pro'  ? onSet  : offSet;
+    lite.className = mode === 'lite' ? onSet : offSet;
+    pro.className  = mode === 'pro'  ? onSet : offSet;
   }
   if (hLite && hPro) {
-    hLite.className = mode === 'lite' ? onHdr  : offHdr;
-    hPro.className  = mode === 'pro'  ? onHdr  : offHdr;
+    hLite.className = mode === 'lite' ? onHdr : offHdr;
+    hPro.className  = mode === 'pro'  ? onHdr : offHdr;
   }
 }
 
@@ -514,8 +516,8 @@ function setActiveBase(base) {
   const on  = 'flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all bg-primary text-on-primary';
   const off = 'flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all text-on-surface-variant';
 
-  g.className = base === 'gross' ? on  : off;
-  n.className = base === 'net'   ? on  : off;
+  g.className = base === 'gross' ? on : off;
+  n.className = base === 'net'   ? on : off;
 }
 
 // === Слушатели кнопок ===
@@ -540,7 +542,6 @@ document.getElementById('set-base-net').addEventListener('click', async () => {
   if (r.ok) calcDefaults = r.settings;
 });
 
-// Header Lite/Pro switcher
 document.getElementById('hdr-lite').addEventListener('click', async () => {
   setActiveMode('lite');
   const r = await apiPost('saveSettings', { settings: { mode: 'lite' } });
@@ -567,7 +568,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Проверка авторизации
   try {
     const auth = await apiGet('verify');
     if (!auth.ok) {
@@ -579,6 +579,5 @@ window.addEventListener('DOMContentLoaded', async () => {
     return showError('Не удалось подключиться к API: ' + err.message);
   }
 
-  // Дефолтный таб
   switchTab('dashboard');
 });
