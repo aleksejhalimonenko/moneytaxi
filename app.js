@@ -392,11 +392,16 @@ async function saveReport() {
       return toast('❌ Сначала укажите наличные Uber');
     }
 
+    const gross = parseFloat(document.getElementById('in-gross').value) || 0;
+    const cash  = parseFloat(document.getElementById('in-cash').value) || 0;
+
     const params = {
       screenshots: queueData.screenshots,
+      gross: gross,
+      net: gross - cash,   // ← добавить
       km:    parseFloat(document.getElementById('in-km').value) || 0,
       fuel:  parseFloat(document.getElementById('in-fuel').value) || 0,
-      cash:  parseFloat(document.getElementById('in-cash').value) || 0,
+      cash:  cash,
       depRate: parseFloat(document.getElementById('in-dep-rate').value) || 0,
       promoBonusBase: parseFloat(document.getElementById('in-promo-base').value) || 0,
       includeZus: document.getElementById('in-zus-toggle').checked,
