@@ -2,7 +2,7 @@
    MoneyTaxi WebApp — frontend logic (fixed)
    ═══════════════════════════════════════════════════ */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbyasv6tjR__pNpLH8_vMV8pqFJD7_EoatqX_DgtZTFCce2key2niHyRFQK2huLyUJGe/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbx_h3-mJ4KXRAa64vJlGy70rpM516QQX_ILf5qoH9A9x-7b5-b6gPrkh4GuTuKL5f5f/exec';
 
 // === Telegram WebApp initData ===
 // ВАЖНО: telegram-web-app.js должен быть подключён в <head> ДО этого файла
