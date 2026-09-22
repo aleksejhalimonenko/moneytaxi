@@ -630,28 +630,103 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
   if (!files.length) return;
 
   const status = document.getElementById('upload-status');
-  status.classList.remove('hidden');
-  status.textContent = `Загрузка ${files.length} файл(ов)...`;
 
-  for (const file of files) {
-    try {
-      const base64 = await fileToBase64Compressed(file);
-      const data = await apiPost('uploadScreenshot', { base64, filename: file.name });
-      if (!data.ok) {
-        const reason = data.error === 'pending_cash'
-          ? 'сначала укажите наличные Uber'
-          : (data.error || 'ошибка');
-        status.textContent = `❌ ${file.name}: ${reason}`;
+  // Состояние каждого файла
+  const items = files.map(f => ({
+    name: f.name,
+    file: f,
+    state: 'queued',   // queued | loading | ok | error
+    platform: '',
+    error: ''
+  }));
+
+  function renderUploadStatus() {
+    const total = items.length;
+    const done = items.filter(i => i.state === 'ok' || i.state === 'error').length;
+    const allDone = done === total;
+    const okCount = items.filter(i => i.state === 'ok').length;
+    const errCount = items.filter(i => i.state === 'error').length;
+
+    let headerText, headerColor;
+    if (!allDone) {
+      headerText = `📸 Загрузка ${Math.min(done + 1, total)} из ${total}`;
+      headerColor = 'text-primary';
+    } else if (errCount === 0) {
+      headerText = `✅ Готово: ${okCount} ${okCount === 1 ? 'файл' : 'файлов'}`;
+      headerColor = 'text-primary';
+    } else if (okCount === 0) {
+      headerText = `❌ Не удалось: ${errCount}`;
+      headerColor = 'text-error';
+    } else {
+      headerText = `⚠️ Готово: ${okCount} ✓, ${errCount} ✗`;
+      headerColor = 'text-tertiary';
+    }
+
+    const rows = items.map(it => {
+      const shortName = it.name.length > 22 ? it.name.substring(0, 19) + '...' : it.name;
+      let icon, label, cls;
+      if (it.state === 'queued') {
+        icon = '⏸'; label = 'в очереди'; cls = 'text-on-surface-variant';
+      } else if (it.state === 'loading') {
+        icon = '<span class="spinner inline-block">🔄</span>';
+        label = 'распознаю...'; cls = 'text-primary';
+      } else if (it.state === 'ok') {
+        icon = '✅';
+        label = it.platform || 'распознан';
+        cls = 'text-primary';
       } else {
-        status.textContent = `✅ ${file.name}: распознан (${data.parsed.platform})`;
+        icon = '❌';
+        label = it.error || 'ошибка';
+        cls = 'text-error';
+      }
+      return `<div class="flex items-center gap-2 ${cls}">
+        <span class="shrink-0 w-5 text-center">${icon}</span>
+        <span class="truncate flex-1">${esc(shortName)}</span>
+        <span class="shrink-0 text-[10px] opacity-80">${esc(label)}</span>
+      </div>`;
+    }).join('');
+
+    status.innerHTML = `
+      <div class="flex flex-col gap-2">
+        <div class="font-mono text-[11px] font-bold uppercase ${headerColor}">${headerText}</div>
+        <div class="flex flex-col gap-1 font-mono text-[11px]">${rows}</div>
+      </div>`;
+  }
+
+  status.classList.remove('hidden');
+  renderUploadStatus();
+
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    it.state = 'loading';
+    renderUploadStatus();
+
+    try {
+      const base64 = await fileToBase64Compressed(it.file);
+      const data = await apiPost('uploadScreenshot', { base64, filename: it.file.name });
+      if (!data.ok) {
+        it.state = 'error';
+        it.error = data.error === 'pending_cash'
+          ? 'сначала укажите нал Uber'
+          : (data.error || 'ошибка');
+      } else {
+        it.state = 'ok';
+        it.platform = data.parsed.platform || 'распознан';
       }
     } catch (err) {
-      status.textContent = `❌ ${file.name}: ${err.message}`;
+      it.state = 'error';
+      it.error = err.message;
     }
+    renderUploadStatus();
   }
+
   e.target.value = '';
-  setTimeout(() => status.classList.add('hidden'), 3000);
-  loadQueue();
+
+  // После завершения — держим ещё 4 сек, потом скрываем и обновляем очередь
+  setTimeout(() => {
+    status.classList.add('hidden');
+    loadQueue();
+  }, 4000);
 });
 
 function fileToBase64Compressed(file) {
