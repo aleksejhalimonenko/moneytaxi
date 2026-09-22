@@ -3,7 +3,7 @@
    v28.3 — universal toast + button loading + dynamic week titles
    ═══════════════════════════════════════════════════ */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbwJRvlhnQGAJJubDnQxApcl7a32VOCsDP_lP55YnLRZzLjNHNMShYw_gOVewEvExOl4/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
 
 // === Telegram WebApp initData ===
 const tg = window.Telegram && window.Telegram.WebApp;
