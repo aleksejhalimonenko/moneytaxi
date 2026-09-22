@@ -232,14 +232,14 @@ tailwind.config = {
 
         <div class="bg-surface-container rounded-xl p-4">
           <div class="flex items-center justify-between mb-3">
-            <span class="font-headline text-sm font-semibold">Последние 8 недель</span>
+            <span id="dash-sparkline-title" class="font-headline text-sm font-semibold">Последние недели</span>
             <span class="font-mono text-[10px] text-on-surface-variant">на руки, PLN</span>
           </div>
-          <div id="dash-sparkline" class="h-20 flex items-end gap-1"></div>
+          <div id="dash-sparkline" class="h-24 flex items-end gap-1"></div>
         </div>
 
         <div class="bg-surface-container-low rounded-xl p-4">
-          <div class="font-headline text-sm font-semibold mb-3">Итого за 4 недели</div>
+          <div id="sum4-title" class="font-headline text-sm font-semibold mb-3">Итого за 4 недели</div>
           <div class="flex flex-col gap-2 font-mono text-sm">
             <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="sum4-card" class="font-semibold">0,00 zł</span></div>
             <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="sum4-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
