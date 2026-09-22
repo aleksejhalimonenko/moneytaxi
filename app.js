@@ -3,7 +3,7 @@
    v27 — синхр. с bot.gs (ядро v23) + Lite/Pro + cache
    ═══════════════════════════════════════════════════ */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbwUkLGCZuXIAE3wKi3S9Mm16T4qcZPOy9TPCrcl-7U4zH_dIXbyoYrL7yDe_gMDFB8/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzxAfFZuxgDYzF1XnJarE8KcaFJNvjHHn7oWR2G4G8TnlcUAd6_Y9ZkqwUT7qjmtXYS/exec';
 
 // === Telegram WebApp initData ===
 const tg = window.Telegram && window.Telegram.WebApp;
