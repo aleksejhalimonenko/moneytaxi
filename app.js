@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v27 — синхр. с bot.gs (ядро v23)
+   v27 — синхр. с bot.gs (ядро v23) + Lite/Pro + cache
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwUkLGCZuXIAE3wKi3S9Mm16T4qcZPOy9TPCrcl-7U4zH_dIXbyoYrL7yDe_gMDFB8/exec';
@@ -49,12 +49,38 @@ function hideLoading() {
   if (el) el.classList.add('hidden');
 }
 
+// === CACHE ===
+const CACHE = {
+  data: {},
+  TTL: 30000,   // 30 сек
+  get(key) {
+    const e = this.data[key];
+    if (!e) return null;
+    if (Date.now() - e.ts > this.TTL) { delete this.data[key]; return null; }
+    return e.value;
+  },
+  set(key, value) { this.data[key] = { value, ts: Date.now() }; },
+  invalidate(prefix) {
+    if (!prefix) { this.data = {}; return; }
+    Object.keys(this.data).forEach(k => {
+      if (k.indexOf(prefix) === 0) delete this.data[k];
+    });
+  }
+};
+
 // === API ===
-async function apiGet(action, params = {}) {
+async function apiGet(action, params = {}, opts = {}) {
+  const key = 'GET:' + action + ':' + JSON.stringify(params);
+  if (!opts.fresh) {
+    const cached = CACHE.get(key);
+    if (cached) return cached;
+  }
   try {
     const qs = new URLSearchParams({ action, initData, ...params });
     const res = await fetch(`${API_URL}?${qs.toString()}`);
-    return await res.json();
+    const data = await res.json();
+    if (data.ok) CACHE.set(key, data);
+    return data;
   } catch (err) {
     return { ok: false, error: 'network', message: err.message };
   }
@@ -67,9 +93,26 @@ async function apiPost(action, payload = {}) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ action, initData, ...payload })
     });
-    return await res.json();
+    const data = await res.json();
+    if (data.ok) _invalidateAfterPost(action);
+    return data;
   } catch (err) {
     return { ok: false, error: 'network', message: err.message };
+  }
+}
+
+function _invalidateAfterPost(action) {
+  const a = (action || '').toLowerCase();
+  if (a === 'uploadscreenshot' || a === 'removescreenshot' || a === 'updatecash' || a === 'clearqueue') {
+    CACHE.invalidate('GET:queue');
+    CACHE.invalidate('GET:dashboard');
+  }
+  if (a === 'savereport') {
+    CACHE.invalidate();
+  }
+  if (a === 'savesettings') {
+    CACHE.invalidate('GET:settings');
+    CACHE.invalidate('GET:dashboard');
   }
 }
 
@@ -101,54 +144,82 @@ function switchTab(name) {
 }
 
 // === Dashboard ===
-async function loadDashboard() {
-  hideError();
-  try {
-    const data = await apiGet('dashboard');
-    if (!data.ok) { showError(data.error || 'dashboard_failed'); return; }
+async function fetchDashboard() {
+  return await apiGet('dashboard');
+}
 
-    if (data.empty) {
-      document.getElementById('dash-last-empty').classList.remove('hidden');
-      document.getElementById('dash-last').classList.add('hidden');
-      document.getElementById('dash-last').classList.remove('flex');
-      document.getElementById('dash-total').textContent = 'Всего: 0 недель';
+function renderDashboard(data) {
+  if (!data || !data.ok) return;
+
+  const isLite = (data.mode || 'lite') === 'lite';
+
+  document.querySelectorAll('[data-mode="pro-only"]').forEach(el => {
+    el.classList.toggle('hidden', isLite);
+  });
+
+  if (data.empty) {
+    document.getElementById('dash-last-empty').classList.remove('hidden');
+    document.getElementById('dash-last').classList.add('hidden');
+    document.getElementById('dash-last').classList.remove('flex');
+    document.getElementById('dash-total').textContent = 'Всего: 0 недель';
+    return;
+  }
+
+  document.getElementById('dash-last-empty').classList.add('hidden');
+  document.getElementById('dash-last').classList.remove('hidden');
+  document.getElementById('dash-last').classList.add('flex');
+
+  const w = data.lastWeek || {};
+  document.getElementById('dash-period').textContent = w.dateRange || '—';
+  document.getElementById('dash-platform').textContent = (w.platform || '') + ' • ' + (w.mode || '');
+  document.getElementById('dash-net-cash').textContent = fmt(w.netCash);
+  document.getElementById('dash-net-full').textContent = fmt(w.netFull);
+  document.getElementById('dash-gross').textContent    = fmt(w.gross);
+  document.getElementById('dash-card').textContent     = fmt(w.cardPayout);
+  document.getElementById('dash-cash').textContent     = fmt(w.cash);
+  document.getElementById('dash-net').textContent      = fmt(w.net);
+  document.getElementById('dash-fuel').textContent     = fmt(w.fuel);
+  document.getElementById('dash-km').textContent       = (w.km || 0) + ' км';
+  document.getElementById('dash-total').textContent    = 'Всего: ' + (data.totalReports || 0) + ' недель';
+
+  const spark = data.sparkline || [];
+  const container = document.getElementById('dash-sparkline');
+  if (spark.length === 0) {
+    container.innerHTML = '<div class="w-full text-center text-on-surface-variant font-mono text-[10px] py-4">нет данных</div>';
+  } else {
+    const max = Math.max(...spark.map(s => Number(s.net) || 0), 1);
+    container.innerHTML = spark.map(s => {
+      const h = Math.max(4, Math.round((Number(s.net) || 0) / max * 70));
+      const ttl = esc((s.period || '') + ': ' + fmt(s.net));
+      return `<div class="flex-1 bg-primary/60 rounded-t" style="height:${h}px" title="${ttl}"></div>`;
+    }).join('');
+  }
+
+  const s4 = data.summary4 || {};
+  document.getElementById('sum4-card').textContent = fmt(s4.card);
+  document.getElementById('sum4-cash').textContent = fmt(s4.cash);
+  document.getElementById('sum4-net').textContent  = fmt(s4.net);
+  document.getElementById('sum4-fuel').textContent = fmt(s4.netFuel);
+  document.getElementById('sum4-full').textContent = fmt(s4.netFull);
+}
+
+async function loadDashboard(force = false) {
+  hideError();
+
+  // SWR: сначала из кэша (мгновенно)
+  if (!force) {
+    const cached = CACHE.get('GET:dashboard:{}');
+    if (cached) {
+      renderDashboard(cached);
+      fetchDashboard().then(fresh => { if (fresh.ok) renderDashboard(fresh); }).catch(() => {});
       return;
     }
+  }
 
-    document.getElementById('dash-last-empty').classList.add('hidden');
-    document.getElementById('dash-last').classList.remove('hidden');
-    document.getElementById('dash-last').classList.add('flex');
-
-    const w = data.lastWeek || {};
-    document.getElementById('dash-period').textContent = w.dateRange || '—';
-    document.getElementById('dash-platform').textContent = (w.platform || '') + ' • ' + (w.mode || '');
-    document.getElementById('dash-net-cash').textContent = fmt(w.netCash);
-    document.getElementById('dash-net-full').textContent = fmt(w.netFull);
-    document.getElementById('dash-gross').textContent    = fmt(w.gross);
-    document.getElementById('dash-card').textContent     = fmt(w.cardPayout);
-    document.getElementById('dash-fuel').textContent     = fmt(w.fuel);
-    document.getElementById('dash-km').textContent       = (w.km || 0) + ' км';
-    document.getElementById('dash-total').textContent    = 'Всего: ' + (data.totalReports || 0) + ' недель';
-
-    const spark = data.sparkline || [];
-    const container = document.getElementById('dash-sparkline');
-    if (spark.length === 0) {
-      container.innerHTML = '<div class="w-full text-center text-on-surface-variant font-mono text-[10px] py-4">нет данных</div>';
-    } else {
-      const max = Math.max(...spark.map(s => Number(s.net) || 0), 1);
-      container.innerHTML = spark.map(s => {
-        const h = Math.max(4, Math.round((Number(s.net) || 0) / max * 70));
-        const ttl = esc((s.period || '') + ': ' + fmt(s.net));
-        return `<div class="flex-1 bg-primary/60 rounded-t" style="height:${h}px" title="${ttl}"></div>`;
-      }).join('');
-    }
-
-    const s4 = data.summary4 || {};
-    document.getElementById('sum4-card').textContent = fmt(s4.card);
-    document.getElementById('sum4-cash').textContent = fmt(s4.cash);
-    document.getElementById('sum4-net').textContent  = fmt(s4.net);
-    document.getElementById('sum4-fuel').textContent = fmt(s4.netFuel);
-    document.getElementById('sum4-full').textContent = fmt(s4.netFull);
+  try {
+    const data = await fetchDashboard();
+    if (!data.ok) { showError(data.error || 'dashboard_failed'); return; }
+    renderDashboard(data);
   } catch (err) {
     showError('Dashboard: ' + err.message);
   } finally {
@@ -169,7 +240,6 @@ async function loadQueue() {
   }
 }
 
-// Обновление состояния кнопок под списком
 function updateQueueButtons(list, hasPendingCash) {
   const btnCalc   = document.getElementById('btn-go-calc');
   const btnClear  = document.getElementById('btn-clear-queue');
@@ -178,17 +248,14 @@ function updateQueueButtons(list, hasPendingCash) {
   const hasShots = list.length > 0;
   const canCalc  = hasShots && !hasPendingCash;
 
-  // «Рассчитать»: активна только если есть скрины и нет незакрытой налички
   btnCalc.disabled = !canCalc;
   btnCalc.classList.toggle('opacity-40',    !canCalc);
   btnCalc.classList.toggle('cursor-not-allowed', !canCalc);
 
-  // «Удалить все»: активна если есть хоть один скрин
   btnClear.disabled = !hasShots;
   btnClear.classList.toggle('opacity-40',    !hasShots);
   btnClear.classList.toggle('cursor-not-allowed', !hasShots);
 
-  // Подсказка про pending cash
   const hint = document.getElementById('queue-hint');
   if (hint) {
     if (hasPendingCash) {
@@ -274,7 +341,6 @@ async function setCash(index) {
   loadQueue();
 }
 
-// === Очистка всей очереди ===
 async function clearQueue() {
   const ok = confirm('Удалить все скрины из очереди?');
   if (!ok) return;
@@ -286,7 +352,6 @@ async function clearQueue() {
   loadQueue();
 }
 
-// === Переход к расчёту ===
 function goToCalculation() {
   const btnCalc = document.getElementById('btn-go-calc');
   if (btnCalc && btnCalc.disabled) {
@@ -325,11 +390,11 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
   loadQueue();
 });
 
-// Сжатие через Canvas → уменьшаем до 1600px, JPEG 92%
+// Без сжатия — отдаём оригинал (OCR Google Drive точнее на оригинале)
 function fileToBase64Compressed(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload  = (ev) => resolve(ev.target.result);   // ← отдаём как есть
+    reader.onload  = (ev) => resolve(ev.target.result);
     reader.onerror = () => reject(new Error('file_read_failed'));
     reader.readAsDataURL(file);
   });
@@ -339,18 +404,34 @@ function fileToBase64Compressed(file) {
 let calcDefaults = null;
 let queueTotals = { gross: 0, net: 0, cash: 0, bonuses: 0 };
 
-async function loadCalcDefaults() {
+function applyCalcMode(mode) {
+  const isLite = (mode || 'lite') === 'lite';
+  document.querySelectorAll('[data-calc-pro-only]').forEach(el => {
+    el.classList.toggle('hidden', isLite);
+  });
+}
+
+async function loadCalcDefaults(force = false) {
   hideError();
   try {
-    const data = await apiGet('settings');
+    const data = await apiGet('settings', {}, { fresh: force });
     if (!data.ok) return showError(data.error || 'settings_failed');
     calcDefaults = data.settings;
 
-    document.getElementById('in-dep-rate').value = calcDefaults.depRate;
+    applyCalcMode(calcDefaults.mode);
+
+    // ZUS всегда off по умолчанию
+    const zusToggle = document.getElementById('in-zus-toggle');
+    if (zusToggle) zusToggle.checked = false;
+
+    // Амортизация — только Pro
+    if (calcDefaults.mode !== 'lite') {
+      document.getElementById('in-dep-rate').value = calcDefaults.depRate;
+    }
 
     // Подтягиваем суммы из очереди
     try {
-      const q = await apiGet('queue');
+      const q = await apiGet('queue', {}, { fresh: force });
       if (q.ok && q.screenshots && q.screenshots.length) {
         queueTotals = {
           gross:   q.screenshots.reduce((a, s) => a + (Number(s.gross)   || 0), 0),
@@ -380,18 +461,20 @@ async function loadCalcDefaults() {
 function recalc() {
   const gross      = parseFloat(document.getElementById('in-gross').value) || 0;
   const net        = parseFloat(document.getElementById('in-net').value)   || 0;
-  const km         = parseFloat(document.getElementById('in-km').value)    || 0;
-  const fuel       = parseFloat(document.getElementById('in-fuel').value)  || 0;
   const cash       = parseFloat(document.getElementById('in-cash').value)  || 0;
   const promoBase  = parseFloat(document.getElementById('in-promo-base').value) || 0;
-  const depRate    = parseFloat(document.getElementById('in-dep-rate').value) || 0;
   const includeZus = document.getElementById('in-zus-toggle').checked;
-  const includeFuel = document.getElementById('in-fuel-toggle').checked;
 
   if (!calcDefaults) return;
   const s = calcDefaults;
+  const isLite = (s.mode || 'lite') === 'lite';
 
-  // Формулы 1-в-1 как в bot.gs (buildLiteReport / buildReportRow)
+  const km          = isLite ? 0 : (parseFloat(document.getElementById('in-km').value)    || 0);
+  const fuel        = isLite ? 0 : (parseFloat(document.getElementById('in-fuel').value)  || 0);
+  const depRate     = isLite ? 0 : (parseFloat(document.getElementById('in-dep-rate').value) || 0);
+  const includeFuel = isLite ? false : document.getElementById('in-fuel-toggle').checked;
+
+  // Формулы 1-в-1 как в bot.gs
   const partnerBaseAmount = s.partnerBase === 'net' ? net : gross;
   const partnerVat = partnerBaseAmount * s.partnerPct;
   const promoTax   = promoBase * s.promoTaxPct;
@@ -429,7 +512,7 @@ function recalc() {
 async function saveReport() {
   hideError();
   try {
-    const queueData = await apiGet('queue');
+    const queueData = await apiGet('queue', {}, { fresh: true });
     if (!queueData.ok) return toast('❌ ' + (queueData.error || 'queue_failed'));
     if (!queueData.screenshots || !queueData.screenshots.length) {
       return toast('❌ Загрузите скрины');
@@ -438,14 +521,15 @@ async function saveReport() {
       return toast('❌ Сначала укажите наличные Uber');
     }
 
+    const isLite = (calcDefaults && calcDefaults.mode === 'lite');
     const params = {
       screenshots: queueData.screenshots,
-      km:    parseFloat(document.getElementById('in-km').value) || 0,
-      fuel:  parseFloat(document.getElementById('in-fuel').value) || 0,
-      depRate: parseFloat(document.getElementById('in-dep-rate').value) || 0,
+      km:      isLite ? 0 : (parseFloat(document.getElementById('in-km').value) || 0),
+      fuel:    isLite ? 0 : (parseFloat(document.getElementById('in-fuel').value) || 0),
+      depRate: isLite ? 0 : (parseFloat(document.getElementById('in-dep-rate').value) || 0),
       promoBonusBase: parseFloat(document.getElementById('in-promo-base').value) || 0,
       includeZus: document.getElementById('in-zus-toggle').checked,
-      includeFuel: document.getElementById('in-fuel-toggle').checked
+      includeFuel: isLite ? false : document.getElementById('in-fuel-toggle').checked
     };
 
     const data = await apiPost('saveReport', { params });
@@ -538,6 +622,9 @@ function setActiveMode(mode) {
     hLite.className = mode === 'lite' ? onHdr : offHdr;
     hPro.className  = mode === 'pro'  ? onHdr : offHdr;
   }
+
+  // Переприменяем видимость полей калькулятора
+  if (typeof applyCalcMode === 'function') applyCalcMode(mode);
 }
 
 function setActiveBase(base) {
