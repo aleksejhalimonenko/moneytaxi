@@ -156,6 +156,9 @@ function renderDashboard(data) {
   document.querySelectorAll('[data-mode="pro-only"]').forEach(el => {
     el.classList.toggle('hidden', isLite);
   });
+  document.querySelectorAll('[data-mode="lite-only"]').forEach(el => {
+    el.classList.toggle('hidden', !isLite);
+  });
 
   if (data.empty) {
     document.getElementById('dash-last-empty').classList.remove('hidden');
@@ -177,6 +180,8 @@ function renderDashboard(data) {
   document.getElementById('dash-gross').textContent    = fmt(w.gross);
   document.getElementById('dash-card').textContent     = fmt(w.cardPayout);
   document.getElementById('dash-cash').textContent     = fmt(w.cash);
+    const heroCash = document.getElementById('dash-hero-cash');
+  if (heroCash) heroCash.textContent = fmt(w.cash);
   document.getElementById('dash-net').textContent      = fmt(w.net);
   document.getElementById('dash-fuel').textContent     = fmt(w.fuel);
   document.getElementById('dash-km').textContent       = (w.km || 0) + ' км';
