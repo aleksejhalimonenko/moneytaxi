@@ -477,6 +477,9 @@ async function loadDashboard(force = false) {
 async function loadQueue() {
   hideError();
 
+  const container = document.getElementById('queue-list');
+  const hasRenderedContent = container && container.children.length > 0;
+
   const cached = CACHE.get('GET:queue:{}');
   if (cached) {
     renderQueue(cached.screenshots || []);
@@ -491,6 +494,19 @@ async function loadQueue() {
     return;
   }
 
+  // Если карточки УЖЕ отрендерены — не показываем скелетон, просто обновим в фоне
+  if (hasRenderedContent) {
+    try {
+      const data = await apiGet('queue', {}, { fresh: true });
+      if (data.ok) {
+        renderQueue(data.screenshots || []);
+        updateQueueButtons(data.screenshots || [], data.hasPendingCash);
+      }
+    } catch (_) {}
+    return;
+  }
+
+  // Только при первом заходе (пустой список) — показываем скелетон
   showSkeleton('queue');
   try {
     const data = await apiGet('queue');
@@ -580,7 +596,7 @@ function renderQueue(list) {
             </div>
             ${cashBlock}
           </div>
-          <button onclick="removeScreen(${i})" class="p-2 rounded-lg bg-surface-container-high hover:bg-error/20 text-error shrink-0">
+          <button onclick="removeScreen(${i}, this)" class="p-2 rounded-lg bg-surface-container-high hover:bg-error/20 text-error shrink-0">
             <span class="material-symbols-outlined text-base">delete</span>
           </button>
         </div>
@@ -588,11 +604,54 @@ function renderQueue(list) {
   }).join('');
 }
 
-async function removeScreen(index) {
+let removingInProgress = false;
+
+async function removeScreen(index, btn) {
+  if (removingInProgress) return;   // защита от race (см. прошлый баг bad_index)
+  removingInProgress = true;
   hideError();
-  const data = await apiPost('removeScreenshot', { index });
-  if (!data.ok) return showError(data.error || 'remove_failed');
-  loadQueue();
+
+  // Визуально "погасить" карточку сразу — мгновенный отклик
+  const card = btn ? btn.closest('.bg-surface-container.rounded-xl.p-4') : null;
+  if (card) {
+    card.style.transition = 'opacity 0.2s';
+    card.style.opacity = '0.4';
+    card.style.pointerEvents = 'none';
+  }
+
+  // Блокируем все кнопки удаления
+  document.querySelectorAll('#queue-list button[onclick^="removeScreen"]').forEach(b => {
+    b.disabled = true;
+    b.classList.add('opacity-50', 'cursor-wait');
+  });
+
+  try {
+    const data = await apiPost('removeScreenshot', { index });
+    if (!data.ok) {
+      // Ошибка — восстанавливаем карточку
+      if (card) { card.style.opacity = '1'; card.style.pointerEvents = 'auto'; }
+      document.querySelectorAll('#queue-list button[onclick^="removeScreen"]').forEach(b => {
+        b.disabled = false;
+        b.classList.remove('opacity-50', 'cursor-wait');
+      });
+      removingInProgress = false;
+      return showError(data.error || 'remove_failed');
+    }
+
+    // Успех — рендерим очередь прямо из ответа (без второго запроса)
+    if (data.queue) {
+      renderQueue(data.queue);
+      updateQueueButtons(data.queue, data.hasPendingCash);
+    } else {
+      // fallback если бэк старый
+      loadQueue();
+    }
+  } catch (err) {
+    if (card) { card.style.opacity = '1'; card.style.pointerEvents = 'auto'; }
+    showError('Network: ' + err.message);
+  } finally {
+    removingInProgress = false;
+  }
 }
 
 async function setCash(index) {
