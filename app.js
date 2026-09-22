@@ -1,11 +1,11 @@
 /* ═══════════════════════════════════════════════════
-   MoneyTaxi WebApp — frontend logic (final, синхр. с v23-ботом)
+   MoneyTaxi WebApp — frontend logic
+   v27 — синхр. с bot.gs (ядро v23)
    ═══════════════════════════════════════════════════ */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzBCkU1bL1cbgs4lHDRfSVwOpvlricqQHkbgWhjomwhSMhf6cWbyJyAEiBzI452StDE/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwTPHn5NAWE9yvzPRzpvAik9xIjeRq6HsnXzHR2fJTyJUGp4UEAaurpeHGn73kb1_m5/exec';
 
 // === Telegram WebApp initData ===
-// ВАЖНО: telegram-web-app.js должен быть подключён в <head> ДО этого файла
 const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
@@ -44,17 +44,12 @@ function hideError() {
   if (el) el.classList.add('hidden');
 }
 
-function showLoading() {
-  const el = document.getElementById('loading');
-  if (el) el.classList.remove('hidden');
-}
-
 function hideLoading() {
   const el = document.getElementById('loading');
   if (el) el.classList.add('hidden');
 }
 
-// === API-запросы ===
+// === API ===
 async function apiGet(action, params = {}) {
   try {
     const qs = new URLSearchParams({ action, initData, ...params });
@@ -168,8 +163,40 @@ async function loadQueue() {
     const data = await apiGet('queue');
     if (!data.ok) { showError(data.error || 'queue_failed'); return; }
     renderQueue(data.screenshots || []);
+    updateQueueButtons(data.screenshots || [], data.hasPendingCash);
   } catch (err) {
     showError('Queue: ' + err.message);
+  }
+}
+
+// Обновление состояния кнопок под списком
+function updateQueueButtons(list, hasPendingCash) {
+  const btnCalc   = document.getElementById('btn-go-calc');
+  const btnClear  = document.getElementById('btn-clear-queue');
+  if (!btnCalc || !btnClear) return;
+
+  const hasShots = list.length > 0;
+  const canCalc  = hasShots && !hasPendingCash;
+
+  // «Рассчитать»: активна только если есть скрины и нет незакрытой налички
+  btnCalc.disabled = !canCalc;
+  btnCalc.classList.toggle('opacity-40',    !canCalc);
+  btnCalc.classList.toggle('cursor-not-allowed', !canCalc);
+
+  // «Удалить все»: активна если есть хоть один скрин
+  btnClear.disabled = !hasShots;
+  btnClear.classList.toggle('opacity-40',    !hasShots);
+  btnClear.classList.toggle('cursor-not-allowed', !hasShots);
+
+  // Подсказка про pending cash
+  const hint = document.getElementById('queue-hint');
+  if (hint) {
+    if (hasPendingCash) {
+      hint.classList.remove('hidden');
+      hint.textContent = 'Сначала укажите наличные Uber';
+    } else {
+      hint.classList.add('hidden');
+    }
   }
 }
 
@@ -232,9 +259,7 @@ function renderQueue(list) {
 
 async function removeScreen(index) {
   hideError();
-  console.log('removeScreen called with index:', index);
   const data = await apiPost('removeScreenshot', { index });
-  console.log('removeScreen response:', data);
   if (!data.ok) return showError(data.error || 'remove_failed');
   loadQueue();
 }
@@ -247,6 +272,27 @@ async function setCash(index) {
   const data = await apiPost('updateCash', { index, cash: val });
   if (!data.ok) return showError(data.error || 'update_failed');
   loadQueue();
+}
+
+// === Очистка всей очереди ===
+async function clearQueue() {
+  const ok = confirm('Удалить все скрины из очереди?');
+  if (!ok) return;
+
+  hideError();
+  const data = await apiPost('clearQueue');
+  if (!data.ok) return showError(data.error || 'clear_failed');
+  toast('🗑 Очередь очищена');
+  loadQueue();
+}
+
+// === Переход к расчёту ===
+function goToCalculation() {
+  const btnCalc = document.getElementById('btn-go-calc');
+  if (btnCalc && btnCalc.disabled) {
+    return toast('❌ Сначала загрузите скрины');
+  }
+  switchTab('calculator');
 }
 
 // === Upload ===
@@ -279,14 +325,14 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
   loadQueue();
 });
 
-// Сжатие через Canvas → уменьшаем до 2000px ширины, JPEG 92%
+// Сжатие через Canvas → уменьшаем до 1600px, JPEG 92%
 function fileToBase64Compressed(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        const MAX = 2000;
+        const MAX = 1600;
         let w = img.width, h = img.height;
         if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
         const canvas = document.createElement('canvas');
@@ -318,7 +364,7 @@ async function loadCalcDefaults() {
 
     document.getElementById('in-dep-rate').value = calcDefaults.depRate;
 
-    // Автоподстановка сумм из очереди
+    // Подтягиваем суммы из очереди
     try {
       const q = await apiGet('queue');
       if (q.ok && q.screenshots && q.screenshots.length) {
@@ -329,15 +375,17 @@ async function loadCalcDefaults() {
           bonuses: q.screenshots.reduce((a, s) => a + (Number(s.bonuses) || 0), 0)
         };
 
-        const grossEl = document.getElementById('in-gross');
-        const cashEl  = document.getElementById('in-cash');
-        if (grossEl) grossEl.value = queueTotals.gross.toFixed(2);
-        if (cashEl)  cashEl.value  = queueTotals.cash.toFixed(2);
+        document.getElementById('in-gross').value = queueTotals.gross.toFixed(2);
+        document.getElementById('in-net').value   = queueTotals.net.toFixed(2);
+        document.getElementById('in-cash').value  = queueTotals.cash.toFixed(2);
 
         const promoEl = document.getElementById('in-promo-base');
         if (promoEl && !Number(promoEl.value)) promoEl.value = queueTotals.bonuses.toFixed(2);
       } else {
         queueTotals = { gross: 0, net: 0, cash: 0, bonuses: 0 };
+        document.getElementById('in-gross').value = '0.00';
+        document.getElementById('in-net').value   = '0.00';
+        document.getElementById('in-cash').value  = '0.00';
       }
     } catch (_) {}
 
@@ -347,6 +395,7 @@ async function loadCalcDefaults() {
 
 function recalc() {
   const gross      = parseFloat(document.getElementById('in-gross').value) || 0;
+  const net        = parseFloat(document.getElementById('in-net').value)   || 0;
   const km         = parseFloat(document.getElementById('in-km').value)    || 0;
   const fuel       = parseFloat(document.getElementById('in-fuel').value)  || 0;
   const cash       = parseFloat(document.getElementById('in-cash').value)  || 0;
@@ -358,17 +407,13 @@ function recalc() {
   if (!calcDefaults) return;
   const s = calcDefaults;
 
-  // ─── Синхронизировано с bot.gs (buildLiteReport / buildReportRow) ───
-  // net = сумма net со всех скринов (как на бэке)
-  const net = queueTotals.net || 0;
-
+  // Формулы 1-в-1 как в bot.gs (buildLiteReport / buildReportRow)
   const partnerBaseAmount = s.partnerBase === 'net' ? net : gross;
   const partnerVat = partnerBaseAmount * s.partnerPct;
   const promoTax   = promoBase * s.promoTaxPct;
   const zus        = includeZus ? s.zus : 0;
   const dep        = km * depRate;
 
-  // Формула 1-в-1 как в bot.gs
   const cardPayout = net - cash - partnerVat - promoTax - s.weeklyFee - zus;
   const fuelCost   = includeFuel ? fuel : 0;
   const netCash    = cardPayout + cash;
@@ -376,6 +421,7 @@ function recalc() {
   const netFull    = netCash - dep;
 
   document.getElementById('p-gross').textContent    = fmt(gross);
+  document.getElementById('p-net-input').textContent = fmt(net);
   document.getElementById('p-vat').textContent      = '-' + fmt(partnerVat);
   document.getElementById('p-bonustax').textContent = '-' + fmt(promoTax);
   document.getElementById('p-fee').textContent      = '-' + fmt(s.weeklyFee);
@@ -389,12 +435,13 @@ function recalc() {
   document.getElementById('calc-hero-card').textContent = fmt(cardPayout);
 }
 
-['in-gross','in-km','in-fuel','in-cash','in-promo-base','in-dep-rate','in-zus-toggle','in-fuel-toggle']
+['in-km','in-fuel','in-promo-base','in-dep-rate','in-zus-toggle','in-fuel-toggle']
   .forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('input', recalc);
   });
 
+// === Save Report ===
 async function saveReport() {
   hideError();
   try {
@@ -407,7 +454,6 @@ async function saveReport() {
       return toast('❌ Сначала укажите наличные Uber');
     }
 
-    // НЕ передаём gross/net/cash из формы — бэк сам возьмёт их из screenshots
     const params = {
       screenshots: queueData.screenshots,
       km:    parseFloat(document.getElementById('in-km').value) || 0,
@@ -420,7 +466,8 @@ async function saveReport() {
 
     const data = await apiPost('saveReport', { params });
     if (!data.ok) return toast('❌ ' + (data.error || 'save_failed'));
-    toast('✅ Отчёт сохранён!');
+
+    toast('✅ Отчёт сохранён. Очередь очищена.');
     setTimeout(() => switchTab('dashboard'), 800);
   } catch (err) {
     toast('❌ ' + err.message);
@@ -522,7 +569,7 @@ function setActiveBase(base) {
   n.className = base === 'net'   ? on : off;
 }
 
-// === Слушатели кнопок ===
+// === Слушатели кнопок Settings ===
 document.getElementById('set-lite').addEventListener('click', async () => {
   setActiveMode('lite');
   const r = await apiPost('saveSettings', { settings: { mode: 'lite' } });
