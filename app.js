@@ -232,7 +232,9 @@ function renderQueue(list) {
 
 async function removeScreen(index) {
   hideError();
+  console.log('removeScreen called with index:', index);
   const data = await apiPost('removeScreenshot', { index });
+  console.log('removeScreen response:', data);
   if (!data.ok) return showError(data.error || 'remove_failed');
   loadQueue();
 }
