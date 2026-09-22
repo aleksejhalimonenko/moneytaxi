@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.2 — динамические заголовки недель + цифры на sparkline
+   v28.3 — universal toast + button loading + dynamic week titles
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwJRvlhnQGAJJubDnQxApcl7a32VOCsDP_lP55YnLRZzLjNHNMShYw_gOVewEvExOl4/exec';
@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v28.2';
+const APP_VERSION = 'v28.3';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -42,14 +42,57 @@ function pluralWeeksShort(n) {
   return 'недель';
 }
 
-function toast(msg) {
+/**
+ * Универсальный toast
+ * @param {string} msg — текст
+ * @param {string} type — 'success' (по умолчанию) | 'error' | 'info'
+ */
+function toast(msg, type) {
   const el = document.getElementById('save-toast');
   if (!el) return;
   const txt = el.querySelector('.flex-1');
+  const icon = document.getElementById('save-toast-icon');
+
   if (txt) txt.textContent = msg;
+
+  if (icon) {
+    if (type === 'error') {
+      icon.textContent = 'error';
+      icon.className = 'material-symbols-outlined text-error';
+    } else if (type === 'info') {
+      icon.textContent = 'info';
+      icon.className = 'material-symbols-outlined text-secondary';
+    } else {
+      icon.textContent = 'cloud_done';
+      icon.className = 'material-symbols-outlined text-primary';
+    }
+  }
+
   el.classList.remove('hidden');
   clearTimeout(el._t);
   el._t = setTimeout(() => el.classList.add('hidden'), 2500);
+}
+
+/**
+ * Блокирует кнопку на время выполнения fn().
+ * Меняет текст на «Сохранение...» с иконкой sync.
+ * Восстанавливает исходное состояние по завершении (успех или ошибка).
+ */
+async function withButtonLoading(btn, fn, loadingText) {
+  if (!btn) return await fn();
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('opacity-60', 'cursor-wait');
+  btn.innerHTML =
+    '<span class="material-symbols-outlined spinner">sync</span> ' +
+    (loadingText || 'Сохранение...');
+  try {
+    return await fn();
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('opacity-60', 'cursor-wait');
+    btn.innerHTML = original;
+  }
 }
 
 function showError(msg) {
@@ -123,7 +166,7 @@ function hideSkeleton(name) {
 // === CACHE (in-memory) ===
 const CACHE = {
   data: {},
-  TTL: 30000,   // 30 сек
+  TTL: 30000,
   get(key) {
     const e = this.data[key];
     if (!e) return null;
@@ -141,7 +184,7 @@ const CACHE = {
 
 // === LOCALSTORAGE CACHE (persistent) ===
 const LS = {
-  TTL: 10 * 60 * 1000,   // 10 минут
+  TTL: 10 * 60 * 1000,
   available: (() => {
     try {
       localStorage.setItem('__mt_t', '1');
@@ -542,7 +585,7 @@ async function clearQueue() {
 function goToCalculation() {
   const btnCalc = document.getElementById('btn-go-calc');
   if (btnCalc && btnCalc.disabled) {
-    return toast('❌ Сначала загрузите скрины');
+    return toast('❌ Сначала загрузите скрины', 'error');
   }
   switchTab('calculator');
 }
@@ -703,35 +746,38 @@ function recalc() {
 // === Save Report ===
 async function saveReport() {
   hideError();
-  try {
-    const queueData = await apiGet('queue', {}, { fresh: true });
-    if (!queueData.ok) return toast('❌ ' + (queueData.error || 'queue_failed'));
-    if (!queueData.screenshots || !queueData.screenshots.length) {
-      return toast('❌ Загрузите скрины');
+  const btn = document.querySelector('button[onclick="saveReport()"]');
+  await withButtonLoading(btn, async () => {
+    try {
+      const queueData = await apiGet('queue', {}, { fresh: true });
+      if (!queueData.ok) return toast('❌ ' + (queueData.error || 'queue_failed'), 'error');
+      if (!queueData.screenshots || !queueData.screenshots.length) {
+        return toast('❌ Загрузите скрины', 'error');
+      }
+      if (queueData.hasPendingCash) {
+        return toast('❌ Сначала укажите наличные Uber', 'error');
+      }
+
+      const isLite = (calcDefaults && calcDefaults.mode === 'lite');
+      const params = {
+        screenshots: queueData.screenshots,
+        km:      isLite ? 0 : (parseFloat(document.getElementById('in-km').value) || 0),
+        fuel:    isLite ? 0 : (parseFloat(document.getElementById('in-fuel').value) || 0),
+        depRate: isLite ? 0 : (parseFloat(document.getElementById('in-dep-rate').value) || 0),
+        promoBonusBase: parseFloat(document.getElementById('in-promo-base').value) || 0,
+        includeZus: document.getElementById('in-zus-toggle').checked,
+        includeFuel: isLite ? false : document.getElementById('in-fuel-toggle').checked
+      };
+
+      const data = await apiPost('saveReport', { params });
+      if (!data.ok) return toast('❌ ' + (data.error || 'save_failed'), 'error');
+
+      toast('✅ Отчёт сохранён. Очередь очищена.');
+      setTimeout(() => switchTab('dashboard'), 800);
+    } catch (err) {
+      toast('❌ ' + err.message, 'error');
     }
-    if (queueData.hasPendingCash) {
-      return toast('❌ Сначала укажите наличные Uber');
-    }
-
-    const isLite = (calcDefaults && calcDefaults.mode === 'lite');
-    const params = {
-      screenshots: queueData.screenshots,
-      km:      isLite ? 0 : (parseFloat(document.getElementById('in-km').value) || 0),
-      fuel:    isLite ? 0 : (parseFloat(document.getElementById('in-fuel').value) || 0),
-      depRate: isLite ? 0 : (parseFloat(document.getElementById('in-dep-rate').value) || 0),
-      promoBonusBase: parseFloat(document.getElementById('in-promo-base').value) || 0,
-      includeZus: document.getElementById('in-zus-toggle').checked,
-      includeFuel: isLite ? false : document.getElementById('in-fuel-toggle').checked
-    };
-
-    const data = await apiPost('saveReport', { params });
-    if (!data.ok) return toast('❌ ' + (data.error || 'save_failed'));
-
-    toast('✅ Отчёт сохранён. Очередь очищена.');
-    setTimeout(() => switchTab('dashboard'), 800);
-  } catch (err) {
-    toast('❌ ' + err.message);
-  }
+  }, 'Расчёт...');
 }
 
 // === Settings ===
@@ -798,37 +844,45 @@ function renderSettings(s) {
 
 async function saveSettings() {
   hideError();
-  const settings = {
-    partnerPct:  (parseFloat(document.getElementById('set-partner-pct').value) || 0) / 100,
-    promoTaxPct: (parseFloat(document.getElementById('set-promo-tax').value) || 0) / 100,
-    weeklyFee:   parseFloat(document.getElementById('set-weekly-fee').value) || 0,
-    zus:         parseFloat(document.getElementById('set-zus').value) || 0,
-    depRate:     parseFloat(document.getElementById('set-dep-rate').value) || 0,
-    partnerBase: currentBase,
-    mode:        currentMode
-  };
-  const data = await apiPost('saveSettings', { settings });
-  if (data.ok) {
-    toast('✅ Настройки сохранены');
-    calcDefaults = data.settings;
-  } else {
-    toast('❌ ' + (data.error || 'save_failed'));
-  }
+  const btn = document.querySelector('button[onclick="saveSettings()"]');
+  await withButtonLoading(btn, async () => {
+    const settings = {
+      partnerPct:  (parseFloat(document.getElementById('set-partner-pct').value) || 0) / 100,
+      promoTaxPct: (parseFloat(document.getElementById('set-promo-tax').value) || 0) / 100,
+      weeklyFee:   parseFloat(document.getElementById('set-weekly-fee').value) || 0,
+      zus:         parseFloat(document.getElementById('set-zus').value) || 0,
+      depRate:     parseFloat(document.getElementById('set-dep-rate').value) || 0,
+      partnerBase: currentBase,
+      mode:        currentMode
+    };
+    const data = await apiPost('saveSettings', { settings });
+    if (data.ok) {
+      toast('✅ Настройки сохранены');
+      calcDefaults = data.settings;
+    } else {
+      toast('❌ ' + (data.error || 'save_failed'), 'error');
+    }
+  }, 'Сохранение...');
 }
 
 async function resetSettings() {
-  const defaults = {
-    partnerPct: 0.05, partnerBase: 'gross', promoTaxPct: 0.23,
-    weeklyFee: 60, zus: 350, depRate: 0.50, mode: 'lite'
-  };
-  const data = await apiPost('saveSettings', { settings: defaults });
-  if (data.ok) {
-    toast('✅ Сброшено');
-    calcDefaults = data.settings;
-    loadSettings();
-  } else {
-    toast('❌ ' + (data.error || 'reset_failed'));
-  }
+  if (!confirm('Сбросить настройки к дефолтным?')) return;
+  hideError();
+  const btn = document.querySelector('button[onclick="resetSettings()"]');
+  await withButtonLoading(btn, async () => {
+    const defaults = {
+      partnerPct: 0.05, partnerBase: 'gross', promoTaxPct: 0.23,
+      weeklyFee: 60, zus: 350, depRate: 0.50, mode: 'lite'
+    };
+    const data = await apiPost('saveSettings', { settings: defaults });
+    if (data.ok) {
+      toast('✅ Сброшено');
+      calcDefaults = data.settings;
+      loadSettings();
+    } else {
+      toast('❌ ' + (data.error || 'reset_failed'), 'error');
+    }
+  }, 'Сброс...');
 }
 
 // === Mode / Base toggle ===
@@ -908,7 +962,6 @@ document.getElementById('hdr-pro').addEventListener('click', async () => {
 
 // === Init ===
 window.addEventListener('DOMContentLoaded', async () => {
-  // Скрываем старый спиннер сразу
   hideLoading();
 
   if (tg) {
