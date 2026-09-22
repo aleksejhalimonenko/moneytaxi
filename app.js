@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.3 — universal toast + button loading + dynamic week titles
+   v28.4 — dirty-tracking settings + universal toast + button loading
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v28.3';
+const APP_VERSION = 'v28.4';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -75,7 +75,6 @@ function toast(msg, type) {
 
 /**
  * Блокирует кнопку на время выполнения fn().
- * Меняет текст на «Сохранение...» с иконкой sync.
  * Восстанавливает исходное состояние по завершении (успех или ошибка).
  */
 async function withButtonLoading(btn, fn, loadingText) {
@@ -110,6 +109,41 @@ function hideError() {
 function hideLoading() {
   const el = document.getElementById('loading');
   if (el) el.classList.add('hidden');
+}
+
+// === SETTINGS DIRTY TRACKING ===
+let settingsDirty = false;
+
+function markSettingsDirty() {
+  if (settingsDirty) return;
+  settingsDirty = true;
+  const btn = document.getElementById('btn-save-settings');
+  const txt = document.getElementById('btn-save-settings-text');
+  if (btn) {
+    btn.classList.remove('bg-primary', 'text-on-primary');
+    btn.classList.add('bg-tertiary-container', 'text-on-tertiary-container');
+  }
+  if (txt) txt.textContent = 'Сохранить изменения';
+}
+
+function clearSettingsDirty() {
+  settingsDirty = false;
+  const btn = document.getElementById('btn-save-settings');
+  const txt = document.getElementById('btn-save-settings-text');
+  if (btn) {
+    btn.classList.remove('bg-tertiary-container', 'text-on-tertiary-container');
+    btn.classList.add('bg-primary', 'text-on-primary');
+  }
+  if (txt) txt.textContent = 'Сохранить настройки';
+}
+
+function bindSettingsDirtyTracking() {
+  // Только числовые поля. Toggle (Lite/Pro, gross/net) сохраняются моментально и не считаются "грязными"
+  ['set-partner-pct', 'set-promo-tax', 'set-weekly-fee', 'set-zus', 'set-dep-rate']
+    .forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', markSettingsDirty);
+    });
 }
 
 // === PROGRESS BAR ===
@@ -837,6 +871,9 @@ function renderSettings(s) {
     setActiveMode(s.mode || 'lite');
     setActiveBase(s.partnerBase || 'gross');
     calcDefaults = s;
+
+    // Свежие данные с сервера — сбрасываем "грязный" флаг
+    clearSettingsDirty();
   } catch (err) {
     showError('renderSettings: ' + err.message);
   }
@@ -844,7 +881,8 @@ function renderSettings(s) {
 
 async function saveSettings() {
   hideError();
-  const btn = document.querySelector('button[onclick="saveSettings()"]');
+  const btn = document.getElementById('btn-save-settings') ||
+              document.querySelector('button[onclick="saveSettings()"]');
   await withButtonLoading(btn, async () => {
     const settings = {
       partnerPct:  (parseFloat(document.getElementById('set-partner-pct').value) || 0) / 100,
@@ -859,6 +897,7 @@ async function saveSettings() {
     if (data.ok) {
       toast('✅ Настройки сохранены');
       calcDefaults = data.settings;
+      clearSettingsDirty();
     } else {
       toast('❌ ' + (data.error || 'save_failed'), 'error');
     }
@@ -878,6 +917,7 @@ async function resetSettings() {
     if (data.ok) {
       toast('✅ Сброшено');
       calcDefaults = data.settings;
+      clearSettingsDirty();
       loadSettings();
     } else {
       toast('❌ ' + (data.error || 'reset_failed'), 'error');
@@ -970,6 +1010,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     tg.setHeaderColor && tg.setHeaderColor('#10141a');
     tg.setBackgroundColor && tg.setBackgroundColor('#10141a');
   }
+
+  // Привязка отслеживания изменений в настройках
+  bindSettingsDirtyTracking();
 
   PROGRESS.show();
   PROGRESS.set(15);
