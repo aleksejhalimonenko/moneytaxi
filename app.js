@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.1 — fix spinner + settings + localStorage version
+   v28.2 — динамические заголовки недель + цифры на sparkline
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbzFc450KLO7z3aKsLuZOW5U3UANlzEWu2folbG6HaZrsP9uiw2_siBUn1JymlEsAO4k/exec';
@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v28.1';
+const APP_VERSION = 'v28.2';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -32,6 +32,14 @@ function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
+}
+
+function pluralWeeksShort(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return 'недель';
+  if (mod10 === 1) return 'неделя';
+  if (mod10 >= 2 && mod10 <= 4) return 'недели';
+  return 'недель';
 }
 
 function toast(msg) {
@@ -296,19 +304,46 @@ function renderDashboard(data) {
   document.getElementById('dash-net').textContent      = fmt(w.net);
   document.getElementById('dash-fuel').textContent     = fmt(w.fuel);
   document.getElementById('dash-km').textContent       = (w.km || 0) + ' км';
-  document.getElementById('dash-total').textContent    = 'Всего: ' + (data.totalReports || 0) + ' недель';
+  const totalN = data.totalReports || 0;
+  document.getElementById('dash-total').textContent    = 'Всего: ' + totalN + ' ' + pluralWeeksShort(totalN);
 
+  // === SPARKLINE ===
   const spark = data.sparkline || [];
   const container = document.getElementById('dash-sparkline');
+  const sparkTitle = document.getElementById('dash-sparkline-title');
+
   if (spark.length === 0) {
+    if (sparkTitle) sparkTitle.textContent = 'Последние недели';
     container.innerHTML = '<div class="w-full text-center text-on-surface-variant font-mono text-[10px] py-4">нет данных</div>';
   } else {
+    const sparkN = spark.length;
+    if (sparkTitle) {
+      sparkTitle.textContent = 'Последние ' + sparkN + ' ' + pluralWeeksShort(sparkN);
+    }
+
     const max = Math.max(...spark.map(s => Number(s.net) || 0), 1);
     container.innerHTML = spark.map(s => {
-      const h = Math.max(4, Math.round((Number(s.net) || 0) / max * 70));
-      const ttl = esc((s.period || '') + ': ' + fmt(s.net));
-      return `<div class="flex-1 bg-primary/60 rounded-t" style="height:${h}px" title="${ttl}"></div>`;
+      const netVal = Number(s.net) || 0;
+      const h = Math.max(4, Math.round(netVal / max * 70));
+      const ttl = esc((s.period || '') + ': ' + fmt(netVal));
+      const label = netVal > 0 ? Math.round(netVal) : '';
+      return `
+        <div class="flex-1 flex flex-col items-center justify-end gap-1 h-full">
+          <div class="font-mono text-[9px] text-primary font-bold leading-none">${label}</div>
+          <div class="w-full bg-primary/60 rounded-t" style="height:${h}px" title="${ttl}"></div>
+        </div>`;
     }).join('');
+  }
+
+  // === ИТОГО ЗА N НЕДЕЛЬ ===
+  const summaryTitle = document.getElementById('sum4-title');
+  if (summaryTitle) {
+    const s4N = Math.min(4, totalN);
+    if (s4N > 0) {
+      summaryTitle.textContent = 'Итого за ' + s4N + ' ' + pluralWeeksShort(s4N);
+    } else {
+      summaryTitle.textContent = 'Итого за 4 недели';
+    }
   }
 
   const s4 = data.summary4 || {};
