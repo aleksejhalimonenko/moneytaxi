@@ -3,7 +3,7 @@
    v28.2 — динамические заголовки недель + цифры на sparkline
    ═══════════════════════════════════════════════════ */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbzFc450KLO7z3aKsLuZOW5U3UANlzEWu2folbG6HaZrsP9uiw2_siBUn1JymlEsAO4k/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbwJRvlhnQGAJJubDnQxApcl7a32VOCsDP_lP55YnLRZzLjNHNMShYw_gOVewEvExOl4/exec';
 
 // === Telegram WebApp initData ===
 const tg = window.Telegram && window.Telegram.WebApp;
