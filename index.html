@@ -134,10 +134,18 @@ tailwind.config = {
           <div id="dash-card" class="font-mono text-base font-bold text-secondary">0,00 zł</div>
         </div>
         <div class="bg-surface-container-low rounded-xl p-3">
+          <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нал</div>
+          <div id="dash-cash" class="font-mono text-base font-bold text-tertiary">0,00 zł</div>
+        </div>
+        <div class="bg-surface-container-low rounded-xl p-3">
+          <div class="font-mono text-[10px] text-on-surface-variant uppercase">На руки</div>
+          <div id="dash-net" class="font-mono text-base font-bold text-primary">0,00 zł</div>
+        </div>
+        <div data-mode="pro-only" class="bg-surface-container-low rounded-xl p-3">
           <div class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</div>
           <div id="dash-fuel" class="font-mono text-base font-bold text-error">0,00 zł</div>
         </div>
-        <div class="bg-surface-container-low rounded-xl p-3">
+        <div data-mode="pro-only" class="bg-surface-container-low rounded-xl p-3">
           <div class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</div>
           <div id="dash-km" class="font-mono text-base font-bold">0 км</div>
         </div>
@@ -157,8 +165,8 @@ tailwind.config = {
           <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="sum4-card" class="font-semibold">0,00 zł</span></div>
           <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="sum4-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
           <div class="flex justify-between"><span class="text-on-surface-variant">💰 На руки:</span><span id="sum4-net" class="font-semibold text-primary">0,00 zł</span></div>
-          <div class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="sum4-fuel" class="font-semibold">0,00 zł</span></div>
-          <div class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="sum4-full" class="font-semibold text-secondary">0,00 zł</span></div>
+          <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="sum4-fuel" class="font-semibold">0,00 zł</span></div>
+          <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="sum4-full" class="font-semibold text-secondary">0,00 zł</span></div>
         </div>
       </div>
     </div>
@@ -211,7 +219,7 @@ tailwind.config = {
   <section id="tab-calculator" class="hidden flex-col gap-4">
     <div class="flex items-center justify-between">
       <h2 class="font-headline text-xl font-semibold">Расчёт недели</h2>
-      <button onclick="loadCalcDefaults()" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
+      <button onclick="loadCalcDefaults(true)" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
     </div>
 
     <!-- Hero badge -->
@@ -244,7 +252,7 @@ tailwind.config = {
         </div>
       </div>
 
-      <div class="flex flex-col gap-1">
+      <div data-calc-pro-only class="flex flex-col gap-1">
         <label class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</label>
         <div class="relative">
           <input id="in-km" type="number" step="1" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
@@ -252,7 +260,7 @@ tailwind.config = {
         </div>
       </div>
 
-      <div class="flex flex-col gap-1">
+      <div data-calc-pro-only class="flex flex-col gap-1">
         <label class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</label>
         <div class="relative">
           <input id="in-fuel" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
@@ -280,7 +288,7 @@ tailwind.config = {
         </div>
       </div>
 
-      <div class="flex flex-col gap-1">
+      <div data-calc-pro-only class="flex flex-col gap-1">
         <label class="font-mono text-[10px] text-on-surface-variant uppercase">Ставка амортизации</label>
         <div class="relative">
           <input id="in-dep-rate" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0.50" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
@@ -290,7 +298,7 @@ tailwind.config = {
 
       <label class="flex items-center justify-between bg-surface-container rounded-lg p-3 cursor-pointer">
         <span class="font-body text-sm">Вычесть ZUS</span>
-        <input id="in-zus-toggle" type="checkbox" checked class="accent-primary w-5 h-5">
+        <input id="in-zus-toggle" type="checkbox" class="accent-primary w-5 h-5">
       </label>
     </div>
 
@@ -307,8 +315,8 @@ tailwind.config = {
         <span class="text-secondary">💳 К выплате на карту:</span>
         <span id="p-card" class="text-secondary font-bold">0,00 zł</span>
       </div>
-      <div class="flex justify-between mt-2"><span class="text-on-surface-variant">Топливо:</span><span id="p-fuel" class="text-error">0,00 zł</span></div>
-      <div class="flex justify-between"><span class="text-on-surface-variant">Амортизация:</span><span id="p-dep" class="text-error">0,00 zł</span></div>
+      <div data-calc-pro-only class="flex justify-between mt-2"><span class="text-on-surface-variant">Топливо:</span><span id="p-fuel" class="text-error">0,00 zł</span></div>
+      <div data-calc-pro-only class="flex justify-between"><span class="text-on-surface-variant">Амортизация:</span><span id="p-dep" class="text-error">0,00 zł</span></div>
       <div class="flex justify-between bg-surface-container-lowest rounded-lg p-3 mt-2">
         <span class="font-headline text-sm">Реальный профит:</span>
         <span id="p-net" class="font-mono text-xl font-bold text-primary">0,00 zł</span>
