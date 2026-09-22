@@ -498,10 +498,10 @@ tailwind.config = {
         </div>
       </div>
 
-      <button onclick="saveSettings()" class="w-full h-12 rounded-xl bg-primary text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98]">
-        <span class="material-symbols-outlined">save</span>
-        Сохранить настройки
-      </button>
+     <button id="btn-save-settings" onclick="saveSettings()" class="w-full h-12 rounded-xl bg-primary text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+  <span class="material-symbols-outlined">save</span>
+  <span id="btn-save-settings-text">Сохранить настройки</span>
+</button>
 
       <button onclick="resetSettings()" class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2">
         <span class="material-symbols-outlined text-base">restart_alt</span>
