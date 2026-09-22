@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v27 — синхр. с bot.gs (ядро v23) + Lite/Pro + cache
+   v28 — синхр. с bot.gs + localStorage + skeleton + progress
    ═══════════════════════════════════════════════════ */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbx6Yibu9cP2DoHHmmj9zPHtRT3nZo4RUNfpK0MnUe_W2SkulEnpF1o4TdZjqjeBRZH6/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyq87jDvLG1o2GhHZJQejCtYCZVTAJVHS5m1JHlGBx6X4l6B32CApyrwaMeuhfSl-Mx/exec';
 
 // === Telegram WebApp initData ===
 const tg = window.Telegram && window.Telegram.WebApp;
@@ -49,7 +49,58 @@ function hideLoading() {
   if (el) el.classList.add('hidden');
 }
 
-// === CACHE ===
+// === PROGRESS BAR ===
+const PROGRESS = {
+  el: null,
+  value: 0,
+  _init() { if (!this.el) this.el = document.getElementById('progress-bar'); },
+  show() {
+    this._init();
+    if (this.el) { this.el.style.opacity = '1'; this.el.style.width = '0%'; }
+    this.value = 0;
+  },
+  set(v) {
+    this._init();
+    this.value = Math.max(0, Math.min(100, v));
+    if (this.el) this.el.style.width = this.value + '%';
+  },
+  done() {
+    this._init();
+    this.set(100);
+    setTimeout(() => {
+      if (this.el) { this.el.style.opacity = '0'; this.el.style.width = '0%'; }
+    }, 300);
+  }
+};
+
+// === SKELETON ===
+function showSkeleton(name) {
+  const sk = document.getElementById('skeleton-' + name);
+  if (sk) { sk.classList.remove('hidden'); sk.classList.add('flex'); }
+  if (name === 'dashboard') {
+    const c = document.getElementById('dash-content');
+    if (c) { c.classList.add('hidden'); c.classList.remove('flex'); }
+  }
+  if (name === 'settings') {
+    const c = document.getElementById('settings-content');
+    if (c) { c.classList.add('hidden'); c.classList.remove('flex'); }
+  }
+}
+
+function hideSkeleton(name) {
+  const sk = document.getElementById('skeleton-' + name);
+  if (sk) { sk.classList.add('hidden'); sk.classList.remove('flex'); }
+  if (name === 'dashboard') {
+    const c = document.getElementById('dash-content');
+    if (c) { c.classList.remove('hidden'); c.classList.add('flex'); }
+  }
+  if (name === 'settings') {
+    const c = document.getElementById('settings-content');
+    if (c) { c.classList.remove('hidden'); c.classList.add('flex'); }
+  }
+}
+
+// === CACHE (in-memory) ===
 const CACHE = {
   data: {},
   TTL: 30000,   // 30 сек
@@ -68,6 +119,46 @@ const CACHE = {
   }
 };
 
+// === LOCALSTORAGE CACHE (persistent) ===
+const LS = {
+  TTL: 10 * 60 * 1000,   // 10 минут
+  available: (() => {
+    try {
+      localStorage.setItem('__mt_t', '1');
+      localStorage.removeItem('__mt_t');
+      return true;
+    } catch (_) { return false; }
+  })(),
+  get(key) {
+    if (!this.available) return null;
+    try {
+      const raw = localStorage.getItem('mt:' + key);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (!obj || Date.now() - obj.ts > this.TTL) {
+        localStorage.removeItem('mt:' + key);
+        return null;
+      }
+      return obj.value;
+    } catch (_) { return null; }
+  },
+  set(key, value) {
+    if (!this.available) return;
+    try {
+      localStorage.setItem('mt:' + key, JSON.stringify({ value, ts: Date.now() }));
+    } catch (_) {}
+  },
+  invalidate(prefix) {
+    if (!this.available) return;
+    try {
+      const p = 'mt:' + (prefix || '');
+      Object.keys(localStorage).forEach(k => {
+        if (k.indexOf(p) === 0) localStorage.removeItem(k);
+      });
+    } catch (_) {}
+  }
+};
+
 // === API ===
 async function apiGet(action, params = {}, opts = {}) {
   const key = 'GET:' + action + ':' + JSON.stringify(params);
@@ -79,7 +170,12 @@ async function apiGet(action, params = {}, opts = {}) {
     const qs = new URLSearchParams({ action, initData, ...params });
     const res = await fetch(`${API_URL}?${qs.toString()}`);
     const data = await res.json();
-    if (data.ok) CACHE.set(key, data);
+    if (data.ok) {
+      CACHE.set(key, data);
+      // Персистим только dashboard и settings
+      if (action === 'dashboard') LS.set('dashboard', data);
+      if (action === 'settings')  LS.set('settings', data);
+    }
     return data;
   } catch (err) {
     return { ok: false, error: 'network', message: err.message };
@@ -106,13 +202,17 @@ function _invalidateAfterPost(action) {
   if (a === 'uploadscreenshot' || a === 'removescreenshot' || a === 'updatecash' || a === 'clearqueue') {
     CACHE.invalidate('GET:queue');
     CACHE.invalidate('GET:dashboard');
+    LS.invalidate('dashboard');
   }
   if (a === 'savereport') {
     CACHE.invalidate();
+    LS.invalidate();
   }
   if (a === 'savesettings') {
     CACHE.invalidate('GET:settings');
     CACHE.invalidate('GET:dashboard');
+    LS.invalidate('settings');
+    LS.invalidate('dashboard');
   }
 }
 
@@ -180,7 +280,7 @@ function renderDashboard(data) {
   document.getElementById('dash-gross').textContent    = fmt(w.gross);
   document.getElementById('dash-card').textContent     = fmt(w.cardPayout);
   document.getElementById('dash-cash').textContent     = fmt(w.cash);
-    const heroCash = document.getElementById('dash-hero-cash');
+  const heroCash = document.getElementById('dash-hero-cash');
   if (heroCash) heroCash.textContent = fmt(w.cash);
   document.getElementById('dash-net').textContent      = fmt(w.net);
   document.getElementById('dash-fuel').textContent     = fmt(w.fuel);
@@ -211,23 +311,45 @@ function renderDashboard(data) {
 async function loadDashboard(force = false) {
   hideError();
 
-  // SWR: сначала из кэша (мгновенно)
+  // 1. JS-кэш → мгновенно
   if (!force) {
     const cached = CACHE.get('GET:dashboard:{}');
     if (cached) {
       renderDashboard(cached);
+      hideSkeleton('dashboard');
       fetchDashboard().then(fresh => { if (fresh.ok) renderDashboard(fresh); }).catch(() => {});
       return;
     }
   }
 
+  // 2. localStorage → мгновенно (если JS-кэш пуст)
+  if (!force) {
+    const lsCached = LS.get('dashboard');
+    if (lsCached && lsCached.ok) {
+      CACHE.set('GET:dashboard:{}', lsCached);
+      renderDashboard(lsCached);
+      hideSkeleton('dashboard');
+      fetchDashboard().then(fresh => {
+        if (fresh.ok) renderDashboard(fresh);
+      }).catch(() => {});
+      return;
+    }
+  }
+
+  // 3. Скелетон + fetch
+  showSkeleton('dashboard');
   try {
     const data = await fetchDashboard();
-    if (!data.ok) { showError(data.error || 'dashboard_failed'); return; }
+    if (!data.ok) {
+      hideSkeleton('dashboard');
+      showError(data.error || 'dashboard_failed');
+      return;
+    }
     renderDashboard(data);
   } catch (err) {
     showError('Dashboard: ' + err.message);
   } finally {
+    hideSkeleton('dashboard');
     hideLoading();
   }
 }
@@ -235,6 +357,23 @@ async function loadDashboard(force = false) {
 // === Queue ===
 async function loadQueue() {
   hideError();
+
+  // Если JS-кэш есть — сразу рендер, без скелетона
+  const cached = CACHE.get('GET:queue:{}');
+  if (cached) {
+    renderQueue(cached.screenshots || []);
+    updateQueueButtons(cached.screenshots || [], cached.hasPendingCash);
+    // фоновое обновление
+    apiGet('queue', {}, { fresh: true }).then(fresh => {
+      if (fresh.ok) {
+        renderQueue(fresh.screenshots || []);
+        updateQueueButtons(fresh.screenshots || [], fresh.hasPendingCash);
+      }
+    }).catch(() => {});
+    return;
+  }
+
+  showSkeleton('queue');
   try {
     const data = await apiGet('queue');
     if (!data.ok) { showError(data.error || 'queue_failed'); return; }
@@ -242,6 +381,8 @@ async function loadQueue() {
     updateQueueButtons(data.screenshots || [], data.hasPendingCash);
   } catch (err) {
     showError('Queue: ' + err.message);
+  } finally {
+    hideSkeleton('queue');
   }
 }
 
@@ -419,7 +560,18 @@ function applyCalcMode(mode) {
 async function loadCalcDefaults(force = false) {
   hideError();
   try {
-    const data = await apiGet('settings', {}, { fresh: force });
+    // settings — берём из JS-кэша / localStorage / сети
+    let data = !force ? CACHE.get('GET:settings:{}') : null;
+    if (!data && !force) {
+      const lsCached = LS.get('settings');
+      if (lsCached && lsCached.ok) {
+        CACHE.set('GET:settings:{}', lsCached);
+        data = lsCached;
+      }
+    }
+    if (!data) {
+      data = await apiGet('settings', {}, { fresh: force });
+    }
     if (!data.ok) return showError(data.error || 'settings_failed');
     calcDefaults = data.settings;
 
@@ -550,21 +702,53 @@ async function saveReport() {
 // === Settings ===
 async function loadSettings() {
   hideError();
+
+  // JS-кэш → мгновенно
+  const cached = CACHE.get('GET:settings:{}');
+  if (cached && cached.ok) {
+    renderSettings(cached.settings);
+    apiGet('settings', {}, { fresh: true }).then(fresh => {
+      if (fresh.ok) renderSettings(fresh.settings);
+    }).catch(() => {});
+    return;
+  }
+
+  // localStorage → мгновенно
+  const lsCached = LS.get('settings');
+  if (lsCached && lsCached.ok) {
+    CACHE.set('GET:settings:{}', lsCached);
+    renderSettings(lsCached.settings);
+    apiGet('settings', {}, { fresh: true }).then(fresh => {
+      if (fresh.ok) renderSettings(fresh.settings);
+    }).catch(() => {});
+    return;
+  }
+
+  showSkeleton('settings');
   try {
     const data = await apiGet('settings');
-    if (!data.ok) return showError(data.error || 'settings_failed');
-    const s = data.settings;
+    if (!data.ok) {
+      hideSkeleton('settings');
+      return showError(data.error || 'settings_failed');
+    }
+    renderSettings(data.settings);
+  } catch (err) {
+    showError('Settings: ' + err.message);
+  } finally {
+    hideSkeleton('settings');
+  }
+}
 
-    document.getElementById('set-partner-pct').value = (s.partnerPct * 100).toFixed(2);
-    document.getElementById('set-promo-tax').value   = (s.promoTaxPct * 100).toFixed(2);
-    document.getElementById('set-weekly-fee').value  = s.weeklyFee;
-    document.getElementById('set-zus').value         = s.zus;
-    document.getElementById('set-dep-rate').value    = s.depRate;
+function renderSettings(s) {
+  document.getElementById('set-partner-pct').value = (s.partnerPct * 100).toFixed(2);
+  document.getElementById('set-promo-tax').value   = (s.promoTaxPct * 100).toFixed(2);
+  document.getElementById('set-weekly-fee').value  = s.weeklyFee;
+  document.getElementById('set-zus').value         = s.zus;
+  document.getElementById('set-dep-rate').value    = s.depRate;
 
-    setActiveMode(s.mode);
-    setActiveBase(s.partnerBase);
-    calcDefaults = s;
-  } catch (err) { showError('Settings: ' + err.message); }
+  setActiveMode(s.mode);
+  setActiveBase(s.partnerBase);
+  calcDefaults = s;
 }
 
 async function saveSettings() {
@@ -628,7 +812,6 @@ function setActiveMode(mode) {
     hPro.className  = mode === 'pro'  ? onHdr : offHdr;
   }
 
-  // Переприменяем видимость полей калькулятора
   if (typeof applyCalcMode === 'function') applyCalcMode(mode);
 }
 
@@ -687,22 +870,57 @@ window.addEventListener('DOMContentLoaded', async () => {
     tg.setBackgroundColor && tg.setBackgroundColor('#10141a');
   }
 
+  PROGRESS.show();
+  PROGRESS.set(15);
+
   if (!initData) {
     hideLoading();
     showError('Откройте приложение через Telegram-бота');
+    PROGRESS.done();
     return;
   }
 
-  try {
-    const auth = await apiGet('verify');
-    if (!auth.ok) {
-      hideLoading();
-      return showError('Авторизация не прошла: ' + (auth.reason || auth.error));
-    }
-  } catch (err) {
-    hideLoading();
-    return showError('Не удалось подключиться к API: ' + err.message);
+  // Пробуем мгновенно отрендерить из localStorage, пока идут запросы
+  const cachedDash = LS.get('dashboard');
+  if (cachedDash && cachedDash.ok) {
+    CACHE.set('GET:dashboard:{}', cachedDash);
+    renderDashboard(cachedDash);
+    hideSkeleton('dashboard');
+    // покажем таб сразу
+    switchTab('dashboard');
+    PROGRESS.set(60);
   }
 
-  switchTab('dashboard');
+  try {
+    // Параллельно: verify + dashboard
+    PROGRESS.set(40);
+    const [auth, dash] = await Promise.all([
+      apiGet('verify'),
+      apiGet('dashboard', {}, { fresh: !!cachedDash })
+    ]);
+    PROGRESS.set(85);
+
+    if (!auth.ok) {
+      hideLoading();
+      showError('Авторизация не прошла: ' + (auth.reason || auth.error));
+      PROGRESS.done();
+      return;
+    }
+
+    // Если ещё не переключились на dashboard — переключаемся сейчас
+    if (!cachedDash) {
+      switchTab('dashboard');
+      if (dash && dash.ok) {
+        // renderDashboard уже вызывается внутри loadDashboard,
+        // но мы могли ещё не зайти в таб — просто на всякий случай
+      }
+    }
+
+    PROGRESS.set(100);
+  } catch (err) {
+    hideLoading();
+    showError('Не удалось подключиться к API: ' + err.message);
+  } finally {
+    PROGRESS.done();
+  }
 });
