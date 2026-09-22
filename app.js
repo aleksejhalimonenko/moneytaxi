@@ -3,7 +3,7 @@
    v28.1 — fix spinner + settings + localStorage version
    ═══════════════════════════════════════════════════ */
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbx6Yibu9cP2DoHHmmj9zPHtRT3nZo4RUNfpK0MnUe_W2SkulEnpF1o4TdZjqjeBRZH6/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbzFc450KLO7z3aKsLuZOW5U3UANlzEWu2folbG6HaZrsP9uiw2_siBUn1JymlEsAO4k/exec';
 
 // === Telegram WebApp initData ===
 const tg = window.Telegram && window.Telegram.WebApp;
