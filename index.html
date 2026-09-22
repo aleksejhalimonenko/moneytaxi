@@ -433,11 +433,6 @@ tailwind.config = {
       <span class="material-symbols-outlined">save</span>
       Сохранить
     </button>
-
-    <div id="save-toast" class="hidden fixed bottom-24 left-4 right-4 bg-surface-container-highest text-on-surface p-4 rounded-xl shadow-2xl flex items-center gap-3 z-50">
-      <span class="material-symbols-outlined text-primary">cloud_done</span>
-      <div class="flex-1 font-mono text-sm">Отчёт сохранён!</div>
-    </div>
   </section>
 
   <!-- ═════════ TAB: SETTINGS ═════════ -->
@@ -538,6 +533,12 @@ tailwind.config = {
     </button>
   </div>
 </nav>
+
+<!-- ═════════ SAVE TOAST (глобальный — поверх всех вкладок) ═════════ -->
+<div id="save-toast" class="hidden fixed bottom-24 left-4 right-4 bg-surface-container-highest text-on-surface p-4 rounded-xl shadow-2xl flex items-center gap-3 z-[100]">
+  <span id="save-toast-icon" class="material-symbols-outlined text-primary">cloud_done</span>
+  <div class="flex-1 font-mono text-sm">Сохранено</div>
+</div>
 
 <script src="app.js"></script>
 </body>
