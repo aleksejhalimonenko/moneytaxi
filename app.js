@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.5 — + Telegram safeAreaInset fix + DEBUG (временно)
+   v28.6 — safeAreaInset fix: max(top, 56) в fullscreen
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v28.5';
+const APP_VERSION = 'v28.6';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -117,25 +117,31 @@ function hideLoading() {
  * Кладёт их в CSS-переменные --tg-inset-*.
  * Если версия Telegram < 8.0 — тихо выходим, остаются env(safe-area-*).
  *
- * ⚠️ В КОНЦЕ ФУНКЦИИ — ВРЕМЕННЫЙ DEBUG-БЛОК. Убрать после диагностики.
+ * ВАЖНО: в fullscreen Telegram рисует собственную overlay-шапку (~56px)
+ * поверх контента, но safeAreaInset.top даёт только статус-бар
+ * (38 на Android / 44 на iPhone). Реальная высота = max(safeAreaInset.top, 56).
  */
 function applyTelegramInsets() {
   if (!tg) return;
 
-  const version = (tg.version || '').toString();
   const hasApi = tg.isVersionAtLeast && tg.isVersionAtLeast('8.0');
 
   // Резервный путь: если API нет — используем системные env(safe-area-inset-*)
-  // через CSS, ничего сюда не пишем.
   if (!hasApi && !tg.safeAreaInset) return;
 
   const inset = tg.safeAreaInset || {};
   const root = document.documentElement;
 
-  const top    = Math.max(0, Math.round(inset.top    || 0));
+  let top      = Math.max(0, Math.round(inset.top    || 0));
   const bottom = Math.max(0, Math.round(inset.bottom || 0));
   const left   = Math.max(0, Math.round(inset.left   || 0));
   const right  = Math.max(0, Math.round(inset.right  || 0));
+
+  // В fullscreen шапка Telegram перекрывает контент, но safeAreaInset.top
+  // возвращает только системный статус-бар. Реальная высота = max(inset.top, 56).
+  if (tg.isFullscreen && top < 56) {
+    top = 56;
+  }
 
   root.style.setProperty('--tg-inset-top',    top    + 'px');
   root.style.setProperty('--tg-inset-bottom', bottom + 'px');
@@ -146,26 +152,6 @@ function applyTelegramInsets() {
   if (tg.viewportStableHeight) {
     root.style.setProperty('--tg-vh', tg.viewportStableHeight + 'px');
   }
-
-  // ═══════════════════════════════════════════════════
-  // ⚠️ ВРЕМЕННЫЙ DEBUG — показать что получили от Telegram
-  // ═══════════════════════════════════════════════════
-  try {
-    const debugEl = document.getElementById('error-box');
-    if (debugEl) {
-      debugEl.classList.remove('hidden');
-      const dbg = document.getElementById('error-msg');
-      if (dbg) {
-        dbg.textContent =
-          'v=' + version +
-          ' | top=' + top +
-          ' | bottom=' + bottom +
-          ' | fullscreen=' + (tg.isFullscreen || false) +
-          ' | vh=' + (tg.viewportStableHeight || '—');
-      }
-    }
-  } catch (_) {}
-  // ═══════════════════════════════════════════════════
 }
 
 // === SETTINGS DIRTY TRACKING ===
