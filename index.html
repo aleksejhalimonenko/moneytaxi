@@ -49,10 +49,24 @@ tailwind.config = {
     overscroll-behavior: none;
     -webkit-tap-highlight-color: transparent;
     min-height: 100vh;
+    min-height: var(--tg-vh, 100vh);
     min-height: -webkit-fill-available;
   }
-  .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
-  .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+
+  /* === SAFE AREA: max из системного env() и Telegram safeAreaInset === */
+  .pb-safe {
+    padding-bottom: max(
+      env(safe-area-inset-bottom, 0px),
+      var(--tg-inset-bottom, 0px)
+    );
+  }
+  .pt-safe {
+    padding-top: max(
+      env(safe-area-inset-top, 0px),
+      var(--tg-inset-top, 0px)
+    );
+  }
+
   ::-webkit-scrollbar { display: none; }
   .spinner { animation: spin 1s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -498,10 +512,10 @@ tailwind.config = {
         </div>
       </div>
 
-     <button id="btn-save-settings" onclick="saveSettings()" class="w-full h-12 rounded-xl bg-primary text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
-  <span class="material-symbols-outlined">save</span>
-  <span id="btn-save-settings-text">Сохранить настройки</span>
-</button>
+      <button id="btn-save-settings" onclick="saveSettings()" class="w-full h-12 rounded-xl bg-primary text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+        <span class="material-symbols-outlined">save</span>
+        <span id="btn-save-settings-text">Сохранить настройки</span>
+      </button>
 
       <button onclick="resetSettings()" class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2">
         <span class="material-symbols-outlined text-base">restart_alt</span>
