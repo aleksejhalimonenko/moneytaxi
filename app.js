@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.5 — + Telegram safeAreaInset fix (iOS/Android fullscreen)
+   v28.5 — + Telegram safeAreaInset fix + DEBUG (временно)
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -116,6 +116,8 @@ function hideLoading() {
  * Применяет реальные insets от Telegram (Bot API 8.0+).
  * Кладёт их в CSS-переменные --tg-inset-*.
  * Если версия Telegram < 8.0 — тихо выходим, остаются env(safe-area-*).
+ *
+ * ⚠️ В КОНЦЕ ФУНКЦИИ — ВРЕМЕННЫЙ DEBUG-БЛОК. Убрать после диагностики.
  */
 function applyTelegramInsets() {
   if (!tg) return;
@@ -145,15 +147,25 @@ function applyTelegramInsets() {
     root.style.setProperty('--tg-vh', tg.viewportStableHeight + 'px');
   }
 
-  if (typeof DEBUG_TG_LAYOUT !== 'undefined' && DEBUG_TG_LAYOUT) {
-    console.log('[MoneyTaxi] tg.version:', version,
-                '| safeAreaInset:', inset,
-                '| viewportStableHeight:', tg.viewportStableHeight,
-                '| isFullscreen:', tg.isFullscreen);
-  }
-
-  // DEBUG: показать что получили
-  toast('top:' + top + ' bottom:' + bottom + ' v:' + version, 'info');
+  // ═══════════════════════════════════════════════════
+  // ⚠️ ВРЕМЕННЫЙ DEBUG — показать что получили от Telegram
+  // ═══════════════════════════════════════════════════
+  try {
+    const debugEl = document.getElementById('error-box');
+    if (debugEl) {
+      debugEl.classList.remove('hidden');
+      const dbg = document.getElementById('error-msg');
+      if (dbg) {
+        dbg.textContent =
+          'v=' + version +
+          ' | top=' + top +
+          ' | bottom=' + bottom +
+          ' | fullscreen=' + (tg.isFullscreen || false) +
+          ' | vh=' + (tg.viewportStableHeight || '—');
+      }
+    }
+  } catch (_) {}
+  // ═══════════════════════════════════════════════════
 }
 
 // === SETTINGS DIRTY TRACKING ===
@@ -183,7 +195,6 @@ function clearSettingsDirty() {
 }
 
 function bindSettingsDirtyTracking() {
-  // Только числовые поля. Toggle (Lite/Pro, gross/net) сохраняются моментально и не считаются "грязными"
   ['set-partner-pct', 'set-promo-tax', 'set-weekly-fee', 'set-zus', 'set-dep-rate']
     .forEach(id => {
       const el = document.getElementById(id);
@@ -539,7 +550,6 @@ async function loadQueue() {
     return;
   }
 
-  // Если карточки УЖЕ отрендерены — не показываем скелетон, просто обновим в фоне
   if (hasRenderedContent) {
     try {
       const data = await apiGet('queue', {}, { fresh: true });
@@ -551,7 +561,6 @@ async function loadQueue() {
     return;
   }
 
-  // Только при первом заходе (пустой список) — показываем скелетон
   showSkeleton('queue');
   try {
     const data = await apiGet('queue');
@@ -652,11 +661,10 @@ function renderQueue(list) {
 let removingInProgress = false;
 
 async function removeScreen(index, btn) {
-  if (removingInProgress) return;   // защита от race (см. прошлый баг bad_index)
+  if (removingInProgress) return;
   removingInProgress = true;
   hideError();
 
-  // Визуально "погасить" карточку сразу — мгновенный отклик
   const card = btn ? btn.closest('.bg-surface-container.rounded-xl.p-4') : null;
   if (card) {
     card.style.transition = 'opacity 0.2s';
@@ -664,7 +672,6 @@ async function removeScreen(index, btn) {
     card.style.pointerEvents = 'none';
   }
 
-  // Блокируем все кнопки удаления
   document.querySelectorAll('#queue-list button[onclick^="removeScreen"]').forEach(b => {
     b.disabled = true;
     b.classList.add('opacity-50', 'cursor-wait');
@@ -673,7 +680,6 @@ async function removeScreen(index, btn) {
   try {
     const data = await apiPost('removeScreenshot', { index });
     if (!data.ok) {
-      // Ошибка — восстанавливаем карточку
       if (card) { card.style.opacity = '1'; card.style.pointerEvents = 'auto'; }
       document.querySelectorAll('#queue-list button[onclick^="removeScreen"]').forEach(b => {
         b.disabled = false;
@@ -683,12 +689,10 @@ async function removeScreen(index, btn) {
       return showError(data.error || 'remove_failed');
     }
 
-    // Успех — рендерим очередь прямо из ответа (без второго запроса)
     if (data.queue) {
       renderQueue(data.queue);
       updateQueueButtons(data.queue, data.hasPendingCash);
     } else {
-      // fallback если бэк старый
       loadQueue();
     }
   } catch (err) {
@@ -735,11 +739,10 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
 
   const status = document.getElementById('upload-status');
 
-  // Состояние каждого файла
   const items = files.map(f => ({
     name: f.name,
     file: f,
-    state: 'queued',   // queued | loading | ok | error
+    state: 'queued',
     platform: '',
     error: ''
   }));
@@ -826,7 +829,6 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
 
   e.target.value = '';
 
-  // После завершения — держим ещё 4 сек, потом скрываем и обновляем очередь
   setTimeout(() => {
     status.classList.add('hidden');
     loadQueue();
@@ -1051,7 +1053,6 @@ function renderSettings(s) {
     setActiveBase(s.partnerBase || 'gross');
     calcDefaults = s;
 
-    // Свежие данные с сервера — сбрасываем "грязный" флаг
     clearSettingsDirty();
   } catch (err) {
     showError('renderSettings: ' + err.message);
@@ -1189,10 +1190,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     tg.setHeaderColor && tg.setHeaderColor('#10141a');
     tg.setBackgroundColor && tg.setBackgroundColor('#10141a');
 
-    // === SAFE-AREA FIX: применяем инсеты от Telegram ===
+    // === SAFE-AREA FIX ===
     applyTelegramInsets();
 
-    // Пересчитываем при изменениях (fullscreen, поворот, клавиатура)
     if (tg.onEvent) {
       tg.onEvent('viewportChanged', applyTelegramInsets);
       tg.onEvent('safeAreaChanged', applyTelegramInsets);
@@ -1200,7 +1200,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // Привязка отслеживания изменений в настройках
   bindSettingsDirtyTracking();
 
   PROGRESS.show();
