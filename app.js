@@ -151,6 +151,9 @@ function applyTelegramInsets() {
                 '| viewportStableHeight:', tg.viewportStableHeight,
                 '| isFullscreen:', tg.isFullscreen);
   }
+
+  // DEBUG: показать что получили
+  toast('top:' + top + ' bottom:' + bottom + ' v:' + version, 'info');
 }
 
 // === SETTINGS DIRTY TRACKING ===
