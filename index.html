@@ -92,7 +92,9 @@ tailwind.config = {
 </head>
 <body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
 
-<header class="fixed top-0 inset-x-0 z-50 bg-surface/85 backdrop-blur-xl pt-safe shadow-[0_1px_12px_rgba(0,0,0,0.3)]">
+<!-- Header смещён на safe-area сверху -->
+<header class="fixed inset-x-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_12px_rgba(0,0,0,0.3)]"
+        style="top: var(--tg-inset-top, env(safe-area-inset-top, 0px))">
   <div class="h-16 px-4 flex items-center justify-between gap-3">
     <div class="flex items-center gap-2 min-w-0">
       <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
@@ -108,10 +110,14 @@ tailwind.config = {
   </div>
 </header>
 
-<!-- Прогресс-бар под шапкой -->
-<div id="progress-bar" class="fixed top-16 inset-x-0 h-0.5 bg-primary z-40 transition-all duration-200 pointer-events-none" style="width:0%; opacity:0"></div>
+<!-- Прогресс-бар смещён на safe-area + высота header -->
+<div id="progress-bar"
+     class="fixed inset-x-0 h-0.5 bg-primary z-40 transition-all duration-200 pointer-events-none"
+     style="top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 64px); width:0%; opacity:0"></div>
 
-<main class="flex-1 w-full pt-20 pb-24 px-4">
+<!-- Main с padding-top = safe-area + высота header -->
+<main class="flex-1 w-full pb-24 px-4"
+      style="padding-top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 80px)">
 
   <div id="loading" class="flex items-center justify-center py-20">
     <span class="material-symbols-outlined text-primary text-3xl spinner">sync</span>
