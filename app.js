@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.4 — dirty-tracking settings + universal toast + button loading
+   v28.5 — + Telegram safeAreaInset fix (iOS/Android fullscreen)
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v28.4';
+const APP_VERSION = 'v28.5';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -109,6 +109,48 @@ function hideError() {
 function hideLoading() {
   const el = document.getElementById('loading');
   if (el) el.classList.add('hidden');
+}
+
+// === TELEGRAM SAFE-AREA INSETS ===
+/**
+ * Применяет реальные insets от Telegram (Bot API 8.0+).
+ * Кладёт их в CSS-переменные --tg-inset-*.
+ * Если версия Telegram < 8.0 — тихо выходим, остаются env(safe-area-*).
+ */
+function applyTelegramInsets() {
+  if (!tg) return;
+
+  const version = (tg.version || '').toString();
+  const hasApi = tg.isVersionAtLeast && tg.isVersionAtLeast('8.0');
+
+  // Резервный путь: если API нет — используем системные env(safe-area-inset-*)
+  // через CSS, ничего сюда не пишем.
+  if (!hasApi && !tg.safeAreaInset) return;
+
+  const inset = tg.safeAreaInset || {};
+  const root = document.documentElement;
+
+  const top    = Math.max(0, Math.round(inset.top    || 0));
+  const bottom = Math.max(0, Math.round(inset.bottom || 0));
+  const left   = Math.max(0, Math.round(inset.left   || 0));
+  const right  = Math.max(0, Math.round(inset.right  || 0));
+
+  root.style.setProperty('--tg-inset-top',    top    + 'px');
+  root.style.setProperty('--tg-inset-bottom', bottom + 'px');
+  root.style.setProperty('--tg-inset-left',   left   + 'px');
+  root.style.setProperty('--tg-inset-right',  right  + 'px');
+
+  // Стабильная высота viewport (не прыгает при открытой клавиатуре)
+  if (tg.viewportStableHeight) {
+    root.style.setProperty('--tg-vh', tg.viewportStableHeight + 'px');
+  }
+
+  if (typeof DEBUG_TG_LAYOUT !== 'undefined' && DEBUG_TG_LAYOUT) {
+    console.log('[MoneyTaxi] tg.version:', version,
+                '| safeAreaInset:', inset,
+                '| viewportStableHeight:', tg.viewportStableHeight,
+                '| isFullscreen:', tg.isFullscreen);
+  }
 }
 
 // === SETTINGS DIRTY TRACKING ===
@@ -1143,6 +1185,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     tg.expand();
     tg.setHeaderColor && tg.setHeaderColor('#10141a');
     tg.setBackgroundColor && tg.setBackgroundColor('#10141a');
+
+    // === SAFE-AREA FIX: применяем инсеты от Telegram ===
+    applyTelegramInsets();
+
+    // Пересчитываем при изменениях (fullscreen, поворот, клавиатура)
+    if (tg.onEvent) {
+      tg.onEvent('viewportChanged', applyTelegramInsets);
+      tg.onEvent('safeAreaChanged', applyTelegramInsets);
+      tg.onEvent('fullscreenChanged', applyTelegramInsets);
+    }
   }
 
   // Привязка отслеживания изменений в настройках
