@@ -348,6 +348,49 @@ tailwind.config = {
       <button onclick="loadCalcDefaults(true)" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
     </div>
 
+    <!-- ═════════ TAB: HISTORY ═════════ -->
+<section id="tab-history" class="hidden flex-col gap-4">
+
+  <!-- Skeleton -->
+  <div id="skeleton-history" class="hidden flex-col gap-3">
+    <div class="flex items-center justify-between">
+      <div class="skeleton h-6 w-24"></div>
+      <div class="skeleton h-3 w-16"></div>
+    </div>
+    <div class="skeleton h-20 w-full"></div>
+    <div class="skeleton h-20 w-full"></div>
+    <div class="skeleton h-20 w-full"></div>
+  </div>
+
+  <!-- Контент -->
+  <div id="history-content" class="hidden flex-col gap-3">
+    <div class="flex items-center justify-between">
+      <h2 class="font-headline text-xl font-semibold">История</h2>
+      <span id="history-count" class="font-mono text-[10px] text-on-surface-variant">0 отчётов</span>
+    </div>
+
+    <div id="history-list" class="flex flex-col gap-3"></div>
+
+    <div id="history-empty" class="hidden bg-surface-container-low rounded-xl p-6 text-center">
+      <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">history</span>
+      <p class="text-on-surface-variant">Пока нет отчётов</p>
+      <button onclick="switchTab('calculator')" class="mt-3 px-4 py-2 rounded-lg bg-primary text-on-primary font-mono font-semibold">Перейти к расчёту</button>
+    </div>
+
+    <!-- Итоговая сводка -->
+    <div id="history-summary" class="hidden bg-surface-container-low rounded-xl p-4">
+      <div id="history-summary-title" class="font-headline text-sm font-semibold mb-3">Итого</div>
+      <div class="flex flex-col gap-2 font-mono text-sm">
+        <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="hist-sum-card" class="font-semibold">0,00 zł</span></div>
+        <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="hist-sum-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
+        <div class="flex justify-between"><span class="text-on-surface-variant">💰 На руки:</span><span id="hist-sum-net" class="font-semibold text-primary">0,00 zł</span></div>
+        <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="hist-sum-fuel" class="font-semibold">0,00 zł</span></div>
+        <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="hist-sum-full" class="font-semibold text-secondary">0,00 zł</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
     <!-- Hero badge -->
     <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
       <div>
