@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.8 — калькулятор: ZUS не сбрасывается, promo-base без залипания
+   v28.7 — калькулятор: ZUS не сбрасывается, promo-base без залипания
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -220,6 +220,10 @@ function showSkeleton(name) {
     const c = document.getElementById('dash-content');
     if (c) { c.classList.add('hidden'); c.classList.remove('flex'); }
   }
+     if (name === 'history') {
+    const c = document.getElementById('history-content');
+    if (c) { c.classList.add('hidden'); c.classList.remove('flex'); }
+  }
   if (name === 'settings') {
     const c = document.getElementById('settings-content');
     if (c) { c.classList.add('hidden'); c.classList.remove('flex'); }
@@ -231,6 +235,10 @@ function hideSkeleton(name) {
   if (sk) { sk.classList.add('hidden'); sk.classList.remove('flex'); }
   if (name === 'dashboard') {
     const c = document.getElementById('dash-content');
+    if (c) { c.classList.remove('hidden'); c.classList.add('flex'); }
+  }
+     if (name === 'history') {
+    const c = document.getElementById('history-content');
     if (c) { c.classList.remove('hidden'); c.classList.add('flex'); }
   }
   if (name === 'settings') {
@@ -312,6 +320,7 @@ async function apiGet(action, params = {}, opts = {}) {
     if (data.ok) {
       CACHE.set(key, data);
       if (action === 'dashboard') LS.set('dashboard', data);
+       if (action === 'history')   LS.set('history', data);
       if (action === 'settings')  LS.set('settings', data);
     }
     return data;
@@ -356,7 +365,7 @@ function _invalidateAfterPost(action) {
 
 // === Tab Switching ===
 function switchTab(name) {
-  document.querySelectorAll('#tab-dashboard, #tab-screenshots, #tab-calculator, #tab-settings')
+  document.querySelectorAll('#tab-dashboard, #tab-screenshots, #tab-calculator, #tab-history, #tab-settings')
     .forEach(el => { el.classList.add('hidden'); el.classList.remove('flex'); });
 
   const target = document.getElementById('tab-' + name);
@@ -378,6 +387,7 @@ function switchTab(name) {
   if (name === 'dashboard')   loadDashboard();
   if (name === 'screenshots') loadQueue();
   if (name === 'calculator')  loadCalcDefaults();
+     if (name === 'history')     loadHistory();
   if (name === 'settings')    loadSettings();
 }
 
