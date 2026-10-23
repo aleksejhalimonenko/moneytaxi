@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.6 — safeAreaInset fix: max(top, 56) в fullscreen
+   v28.7 — safeAreaInset fix: max(top, 56) в fullscreen
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
