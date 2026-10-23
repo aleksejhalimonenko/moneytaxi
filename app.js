@@ -1111,6 +1111,143 @@ async function resetSettings() {
   }, 'Сброс...');
 }
 
+
+// === History ===
+async function loadHistory(force = false) {
+  hideError();
+
+  // Скелетон
+  showSkeleton('history');
+
+  try {
+    const data = await apiGet('history', { limit: 100 }, { fresh: force });
+    if (!data.ok) {
+      hideSkeleton('history');
+      return showError(data.error || 'history_failed');
+    }
+
+    const list = data.history || [];
+    renderHistory(list);
+  } catch (err) {
+    showError('History: ' + err.message);
+  } finally {
+    hideSkeleton('history');
+  }
+}
+
+function renderHistory(list) {
+  const container = document.getElementById('history-list');
+  const empty = document.getElementById('history-empty');
+  const summary = document.getElementById('history-summary');
+  const count = document.getElementById('history-count');
+
+  count.textContent = list.length + ' ' + pluralWeeksShort(list.length);
+
+  if (!list.length) {
+    container.innerHTML = '';
+    empty.classList.remove('hidden');
+    summary.classList.add('hidden');
+    return;
+  }
+
+  empty.classList.add('hidden');
+  summary.classList.remove('hidden');
+
+  // === Список карточек ===
+  container.innerHTML = list.map((r, i) => {
+    const isOpen = false; // по умолчанию свёрнуто
+    const modeLabel = (r.mode || 'lite') === 'lite' ? 'lite' : 'pro';
+    const plat = r.platform || '—';
+    const period = r.dateRange || '—';
+
+    return `
+      <div class="history-card bg-surface-container rounded-xl p-4 cursor-pointer" data-index="${i}">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] font-bold">${esc(plat)}</span>
+              <span class="font-mono text-[10px] text-on-surface-variant">${esc(period)} • ${esc(modeLabel)}</span>
+            </div>
+            <div class="mt-2 grid grid-cols-2 gap-2 font-mono text-xs">
+              <div><span class="text-on-surface-variant">На руки:</span> <span class="font-semibold text-primary">${fmt(r.netCash)}</span></div>
+              <div><span class="text-on-surface-variant">Профит:</span> <span class="font-semibold text-secondary">${fmt(r.netFull)}</span></div>
+            </div>
+          </div>
+          <span class="material-symbols-outlined text-on-surface-variant history-chevron">expand_more</span>
+        </div>
+        <div class="history-details hidden mt-3 pt-3 border-t border-white/5">
+          <!-- Развёрнутая инфа -->
+          <div class="grid grid-cols-2 gap-2 font-mono text-xs">
+            <div><span class="text-on-surface-variant">Брутто:</span> <span class="font-semibold">${fmt(r.gross)}</span></div>
+            <div><span class="text-on-surface-variant">Нетто:</span> <span class="font-semibold">${fmt(r.net)}</span></div>
+            <div><span class="text-on-surface-variant">Нал:</span> <span class="text-tertiary">${fmt(r.cash)}</span></div>
+            <div><span class="text-on-surface-variant">Бонусы:</span> <span>${fmt(r.bonuses)}</span></div>
+          </div>
+          <div class="mt-2 pt-2 border-t border-white/5 flex flex-col gap-1 font-mono text-xs">
+            <div class="flex justify-between"><span class="text-on-surface-variant">Партнёрка (${(r.partnerPct*100).toFixed(2)}%):</span><span class="text-error">-${fmt(r.partnerVat)}</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">Налог на бонусы:</span><span class="text-error">-${fmt(r.bonusTax)}</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">Комиссия:</span><span class="text-error">-${fmt(r.partnerFee)}</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">ZUS:</span><span class="text-error">-${fmt(r.zus)}</span></div>
+          </div>
+          <div class="mt-2 pt-2 border-t border-white/5 flex flex-col gap-1 font-mono text-xs">
+            <div class="flex justify-between bg-surface-container-high rounded-lg p-2">
+              <span class="text-secondary">💳 На карту:</span>
+              <span class="text-secondary font-bold">${fmt(r.cardPayout)}</span>
+            </div>
+            <div class="flex justify-between bg-surface-container-high rounded-lg p-2">
+              <span class="text-primary">💰 На руки:</span>
+              <span class="text-primary font-bold">${fmt(r.netCash)}</span>
+            </div>
+            <div data-mode="pro-only" class="flex justify-between mt-1"><span class="text-on-surface-variant">Профит:</span><span class="text-secondary font-bold">${fmt(r.netFull)}</span></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // === Слушатели на клик по карточке ===
+  container.querySelectorAll('.history-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // Игнорируем клик по кнопкам внутри (если будут)
+      if (e.target.closest('button')) return;
+
+      const details = card.querySelector('.history-details');
+      const chevron = card.querySelector('.history-chevron');
+      const isOpen = !details.classList.contains('hidden');
+
+      if (isOpen) {
+        details.classList.add('hidden');
+        chevron.textContent = 'expand_more';
+      } else {
+        details.classList.remove('hidden');
+        chevron.textContent = 'expand_less';
+      }
+    });
+  });
+
+  // === Итоговая сводка ===
+  const recent = list.slice(0, 4);  // последние 4
+  const s = { card: 0, cash: 0, net: 0, netFuel: 0, netFull: 0 };
+  recent.forEach(r => {
+    s.card    += Number(r.cardPayout) || 0;
+    s.cash    += Number(r.cash) || 0;
+    s.net     += Number(r.netCash) || 0;
+    s.netFuel += Number(r.netFuel) || 0;
+    s.netFull += Number(r.netFull) || 0;
+  });
+
+  document.getElementById('hist-sum-card').textContent = fmt(s.card);
+  document.getElementById('hist-sum-cash').textContent = fmt(s.cash);
+  document.getElementById('hist-sum-net').textContent  = fmt(s.net);
+  document.getElementById('hist-sum-fuel').textContent = fmt(s.netFuel);
+  document.getElementById('hist-sum-full').textContent = fmt(s.netFull);
+
+  // Заголовок итогов
+  const summaryN = Math.min(4, list.length);
+  document.getElementById('history-summary-title').textContent =
+    'Итого за ' + summaryN + ' ' + pluralWeeksShort(summaryN);
+}
+
 // === Mode / Base toggle ===
 let currentMode = 'lite';
 let currentBase = 'gross';
