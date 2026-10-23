@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.7 — safeAreaInset fix: max(top, 56) в fullscreen
+   v28.8 — калькулятор: ZUS не сбрасывается, promo-base без залипания
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v28.6';
+const APP_VERSION = 'v28.8';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -833,6 +833,16 @@ function fileToBase64Compressed(file) {
 // === Calculator ===
 let calcDefaults = null;
 let queueTotals = { gross: 0, net: 0, cash: 0, bonuses: 0 };
+// true, когда пользователь сам ввёл «Базу бонусов» (тогда не перезаписываем из очереди)
+let promoManual = false;
+
+function resetCalcInputs() {
+  promoManual = false;
+  const promoEl = document.getElementById('in-promo-base');
+  if (promoEl) promoEl.value = '0.00';
+  const zusEl = document.getElementById('in-zus-toggle');
+  if (zusEl) zusEl.checked = false;
+}
 
 function applyCalcMode(mode) {
   const isLite = (mode || 'lite') === 'lite';
@@ -860,8 +870,8 @@ async function loadCalcDefaults(force = false) {
 
     applyCalcMode(calcDefaults.mode);
 
-    const zusToggle = document.getElementById('in-zus-toggle');
-    if (zusToggle) zusToggle.checked = false;
+    // ZUS-тумблер НЕ трогаем: выбор пользователя сохраняется при смене вкладок.
+    // Сбрасывается только после успешного saveReport (см. resetCalcInputs).
 
     if (calcDefaults.mode !== 'lite') {
       document.getElementById('in-dep-rate').value = calcDefaults.depRate;
@@ -881,13 +891,16 @@ async function loadCalcDefaults(force = false) {
         document.getElementById('in-net').value   = queueTotals.net.toFixed(2);
         document.getElementById('in-cash').value  = queueTotals.cash.toFixed(2);
 
+        // Бонусы из очереди подставляем, пока пользователь не правил поле сам
         const promoEl = document.getElementById('in-promo-base');
-        if (promoEl && !Number(promoEl.value)) promoEl.value = queueTotals.bonuses.toFixed(2);
+        if (promoEl && !promoManual) promoEl.value = queueTotals.bonuses.toFixed(2);
       } else {
         queueTotals = { gross: 0, net: 0, cash: 0, bonuses: 0 };
         document.getElementById('in-gross').value = '0.00';
         document.getElementById('in-net').value   = '0.00';
         document.getElementById('in-cash').value  = '0.00';
+        const promoEl = document.getElementById('in-promo-base');
+        if (promoEl && !promoManual) promoEl.value = '0.00';
       }
     } catch (_) {}
 
@@ -944,6 +957,12 @@ function recalc() {
     if (el) el.addEventListener('input', recalc);
   });
 
+// Ручной ввод базы бонусов (программная подстановка value событие input не вызывает)
+(function () {
+  const el = document.getElementById('in-promo-base');
+  if (el) el.addEventListener('input', () => { promoManual = true; });
+})();
+
 // === Save Report ===
 async function saveReport() {
   hideError();
@@ -973,6 +992,7 @@ async function saveReport() {
       const data = await apiPost('saveReport', { params });
       if (!data.ok) return toast('❌ ' + (data.error || 'save_failed'), 'error');
 
+      resetCalcInputs();
       toast('✅ Отчёт сохранён. Очередь очищена.');
       setTimeout(() => switchTab('dashboard'), 800);
     } catch (err) {
