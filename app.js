@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v30.1 — stacked bar chart в dashboard,
-           swipe-карусель, двусторонняя синхронизация
+   v30.3 — stacked bar chart, swipe-карусель,
+           унифицированная история (без большой карточки)
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -11,7 +11,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v30.3';
+const APP_VERSION = 'v30.4';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -421,26 +421,21 @@ function goToTab(index, animated = true) {
   const prevIndex = currentIndex;
   currentIndex = index;
 
-  // Сдвиг трека
   if (animated) trackEl.classList.add('carousel-transition');
   else          trackEl.classList.remove('carousel-transition');
 
   trackEl.style.transform = `translate3d(${-index * 20}%, 0, 0)`;
 
-  // Подсветка кнопок + пилюля
   setActiveTabVisuals(index);
   movePill(tabBtns[index], animated);
 
-  // brand-bar только на «Обзор»
   if (brandBar) brandBar.classList.toggle('hidden', TAB_ORDER[index] !== 'dashboard');
 
-  // Ленивая загрузка только при реальной смене
   if (prevIndex !== index) {
     loadTabData(TAB_ORDER[index]);
   }
 }
 
-// Публичный API — обратная совместимость со старыми onclick="switchTab('...')"
 window.switchTab = function(name) {
   const i = TAB_ORDER.indexOf(name);
   if (i >= 0) goToTab(i, true);
@@ -515,7 +510,6 @@ function bindSwipeGestures() {
   viewportEl.addEventListener('touchend',    onSwipeEnd,   { passive: true });
   viewportEl.addEventListener('touchcancel', onSwipeEnd,   { passive: true });
 
-  // Мышь (десктоп-превью)
   viewportEl.addEventListener('mousedown', (e) => {
     onSwipeStart(e);
     const mm = (ev) => onSwipeMove(ev);
@@ -528,7 +522,6 @@ function bindSwipeGestures() {
     window.addEventListener('mouseup', mu);
   });
 
-  // Клики по кнопкам таб-бара (data-tab-index)
   tabBtns.forEach((btn) => {
     btn.addEventListener('click', () => {
       const i = Number(btn.dataset.tabIndex);
@@ -548,7 +541,6 @@ function bindSwipeGestures() {
 
 let _sparkData = [];
 
-/** Обновляет тултип + подсветку активного столбика */
 function showChartDetail(index) {
   const s = _sparkData[index];
   if (!s) return;
@@ -575,7 +567,6 @@ function showChartDetail(index) {
 }
 window.showChartDetail = showChartDetail;
 
-/** Рисует stacked bar chart в #dash-sparkline */
 function renderSparkline(spark, isLite) {
   const container = document.getElementById('dash-sparkline');
   if (!container) return;
@@ -587,9 +578,8 @@ function renderSparkline(spark, isLite) {
     return;
   }
 
-  const MAX_H = 138; // px — максимальная высота столбика
+  const MAX_H = 138;
 
-  // Общая нормализация — по (gross + fuel) для Pro, по gross для Lite
   const totals = _sparkData.map(s => {
     const g = Number(s.gross) || 0;
     const f = isLite ? 0 : (Number(s.fuel) || 0);
@@ -605,7 +595,6 @@ function renderSparkline(spark, isLite) {
     const netCash = Number(s.netCash) || 0;
     const fuel    = isLite ? 0 : (Number(s.fuel) || 0);
 
-    // Сегменты (защита от отрицательных значений)
     const skyH     = Math.max(0, ((gross - net)   / maxTotal) * MAX_H);
     const emeraldH = Math.max(0, ((net - netCash) / maxTotal) * MAX_H);
     const mintH    = Math.max(0, (netCash        / maxTotal) * MAX_H);
@@ -638,7 +627,6 @@ function renderSparkline(spark, isLite) {
       </div>`;
   }).join('');
 
-  // Автовыбор последней недели
   showChartDetail(_sparkData.length - 1);
 }
 
@@ -659,7 +647,6 @@ function renderDashboard(data) {
     el.classList.toggle('hidden', !isLite);
   });
 
-  // Lite: скрыть 4-й KPI «Топливо» в тултипе + переключить grid-cols
   const tipFuelEl = document.getElementById('tip-fuel');
   if (tipFuelEl) {
     const block = tipFuelEl.parentElement;
@@ -699,7 +686,6 @@ function renderDashboard(data) {
   const totalN = data.totalReports || 0;
   document.getElementById('dash-total').textContent    = 'Всего: ' + totalN + ' ' + pluralWeeksShort(totalN);
 
-  // === STACKED BAR CHART ===
   const spark = data.sparkline || [];
   const sparkTitle = document.getElementById('dash-sparkline-title');
 
@@ -714,7 +700,6 @@ function renderDashboard(data) {
 
   renderSparkline(spark, isLite);
 
-  // === ИТОГО ЗА N НЕДЕЛЬ ===
   const summaryTitle = document.getElementById('sum4-title');
   if (summaryTitle) {
     const s4N = Math.min(4, totalN);
@@ -1414,7 +1399,6 @@ function renderHistory(list) {
     const plat = r.platform || '—';
     const period = r.dateRange || '—';
     const isPro = modeLabel === 'pro';
-    const isFirst = i === 0;
 
     let fuelCostPer100 = '—';
     if (r.km > 0 && r.fuel > 0) {
@@ -1445,121 +1429,6 @@ function renderHistory(list) {
             </div>
           </div>
         </div>`;
-    }
-
-    if (isFirst) {
-      return `
-        <article class="history-card bg-app-card rounded-2xl border border-emerald-500/25 shadow-lg shadow-black/40 overflow-hidden mb-3 cursor-pointer" data-index="${i}">
-          <div class="p-4 bg-gradient-to-b from-app-surface/90 to-app-card border-b border-app-border/60 flex items-center justify-between">
-            <div class="flex flex-wrap items-center gap-2">
-              <div class="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-md border border-slate-700/60 text-xs font-semibold text-slate-200">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                ${esc(plat)}
-              </div>
-              <span class="text-xs text-app-subtext font-medium">${esc(period)}</span>
-              <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">${esc(modeLabel)}</span>
-            </div>
-            <span class="material-symbols-outlined text-slate-400 history-chevron text-xl">expand_less</span>
-          </div>
-
-          <div class="p-4 bg-app-card/60 grid grid-cols-2 gap-3 border-b border-app-border/40">
-            <div class="bg-app-surface/60 rounded-xl p-3 border border-emerald-500/20 relative overflow-hidden">
-              <div class="text-[11px] uppercase tracking-wider font-semibold text-emerald-400/90 mb-1 flex items-center gap-1">
-                <span>Профит (чистыми)</span>
-              </div>
-              <div class="text-xl font-bold tracking-tight text-emerald-400 tabular-nums">
-                ${fmt(r.netFull)}
-              </div>
-              <span class="text-[10px] text-slate-400 block mt-0.5">после всех расходов</span>
-            </div>
-            <div class="bg-app-surface/60 rounded-xl p-3 border border-app-border/70 relative">
-              <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-300 mb-1">
-                К выплате
-              </div>
-              <div class="text-xl font-bold tracking-tight text-white tabular-nums">
-                ${fmt(r.netCash)}
-              </div>
-              <span class="text-[10px] text-app-subtext block mt-0.5">с учётом налички</span>
-            </div>
-          </div>
-
-          <div class="history-details">
-            <div class="px-4 py-3 border-b border-app-border/40 space-y-2.5">
-              <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                <span>Доход от заказов</span>
-                <span class="text-[11px] text-emerald-400 lowercase font-normal">за неделю</span>
-              </div>
-              <div class="space-y-1.5 text-xs">
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">Брутто</span>
-                  <span class="font-medium text-slate-200 tabular-nums">${fmt(r.gross)}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">Нетто</span>
-                  <span class="font-semibold text-white tabular-nums">${fmt(r.net)}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">Бонусы парка / сервисов</span>
-                  <span class="font-medium text-emerald-400 tabular-nums">+${fmt(r.bonuses)}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">Наличные от пассажиров</span>
-                  <span class="font-medium text-amber-300/90 tabular-nums">${fmt(r.cash)}</span>
-                </div>
-              </div>
-            </div>
-
-            ${carBlock}
-
-            <div class="px-4 py-3 border-b border-app-border/40 space-y-2.5">
-              <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                <span>Налоги и комиссии</span>
-                <span class="text-[11px] text-rose-400/80 font-normal">-${fmt(totalTaxes)}</span>
-              </div>
-              <div class="space-y-1.5 text-xs">
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">Партнёрка (${(r.partnerPct * 100).toFixed(2)}%)</span>
-                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.partnerVat)}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">Налог на бонусы</span>
-                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.bonusTax)}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">Комиссия</span>
-                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.partnerFee)}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-slate-400">ZUS</span>
-                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.zus)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="p-3 bg-app-surface/80 m-3 rounded-xl border border-app-border space-y-2">
-              <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-sm text-emerald-400">credit_card</span>
-                Распределение выплаты
-              </div>
-              <div class="flex items-center justify-between text-xs bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
-                <div class="flex items-center gap-2">
-                  <div class="w-5 h-4 bg-amber-400/20 border border-amber-400/40 rounded flex items-center justify-center text-[9px] text-amber-300 font-bold">💳</div>
-                  <span class="text-slate-200 font-medium">Перевод на карту</span>
-                </div>
-                <span class="font-bold text-white tabular-nums">${fmt(r.cardPayout)}</span>
-              </div>
-              <div class="flex items-center justify-between text-xs pt-1 px-1">
-                <span class="text-slate-400">Наличные на руках:</span>
-                <span class="font-medium text-slate-200 tabular-nums">${fmt(r.cash)}</span>
-              </div>
-              <div class="flex items-center justify-between text-xs pt-0.5 px-1 border-t border-slate-800/80">
-                <span class="text-emerald-400 font-semibold">Итого на руки:</span>
-                <span class="font-bold text-emerald-400 tabular-nums text-sm">${fmt(r.netCash)}</span>
-              </div>
-            </div>
-          </div>
-        </article>
-      `;
     }
 
     return `
@@ -1736,8 +1605,6 @@ function setActiveBase(base) {
   n.className = base === 'net'   ? on : off;
 }
 
-
-
 // === Слушатели кнопок Settings ===
 document.getElementById('set-lite').addEventListener('click', async () => {
   setActiveMode('lite');
@@ -1835,7 +1702,6 @@ window.addEventListener('DOMContentLoaded', async () => {
   } finally {
     PROGRESS.done();
 
-    // Позиционируем пилюлю после полной загрузки
     setTimeout(() => {
       measureViewport();
       movePill(tabBtns[currentIndex], false);
