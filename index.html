@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#10141a">
-<title>Money Taxi</title>
+<title>MoneyTaxi</title>
 
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
@@ -107,21 +107,39 @@ tailwind.config = {
   .tab-indicator-spring {
     transition: all 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
+
+  /* ═══ SWIPE CAROUSEL ═══ */
+  .carousel-transition {
+    transition: transform 0.38s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .dragging-active {
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grabbing;
+  }
+  #swipe-viewport {
+    /* жесты по X — сами, по Y — нативный скролл */
+    touch-action: pan-y;
+  }
+  #swipe-track > [data-tab-panel] {
+    height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
 </style>
 </head>
 <body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
-
-<!-- ❌ УДАЛЁН HEADER. Брендинг перенесён в <main> -->
 
 <div id="progress-bar"
      class="fixed inset-x-0 h-0.5 bg-primary z-40 transition-all duration-200 pointer-events-none"
      style="top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 0px); width:0%; opacity:0"></div>
 
-<main class="flex-1 w-full pb-32 px-4"
+<main class="flex-1 w-full pb-32 px-4 overflow-hidden flex flex-col"
       style="padding-top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 12px)">
 
-  <!-- ✅ Брендинг MoneyTaxi + Lite/Pro (перенесено из удалённого header) -->
-  <div id="brand-bar" class="flex items-center justify-between gap-3 pb-4">
+  <!-- ✅ Брендинг MoneyTaxi + Lite/Pro (вне свайпера, всегда сверху) -->
+  <div id="brand-bar" class="flex items-center justify-between gap-3 pb-4 shrink-0">
     <div class="flex items-center gap-2 min-w-0">
       <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
       <span class="material-symbols-outlined text-primary text-[18px]">local_taxi</span>
@@ -133,438 +151,459 @@ tailwind.config = {
     </div>
   </div>
 
-  <div id="loading" class="flex items-center justify-center py-20">
+  <div id="loading" class="flex items-center justify-center py-20 shrink-0">
     <span class="material-symbols-outlined text-primary text-3xl spinner">sync</span>
   </div>
 
-  <div id="error-box" class="hidden bg-error-container text-on-error-container rounded-xl p-4">
+  <div id="error-box" class="hidden bg-error-container text-on-error-container rounded-xl p-4 shrink-0">
     <div class="font-semibold mb-1">Ошибка</div>
     <div id="error-msg" class="text-sm"></div>
   </div>
 
-  <!-- ═════════ TAB: DASHBOARD ═════════ -->
-  <section id="tab-dashboard" class="hidden flex-col gap-4">
-    <div id="skeleton-dashboard" class="hidden flex-col gap-4">
-      <div class="flex items-center justify-between">
-        <div class="skeleton h-6 w-24"></div>
-        <div class="skeleton h-3 w-20"></div>
-      </div>
-      <div class="bg-surface-container-high rounded-xl p-4 flex flex-col gap-3">
-        <div class="flex items-center justify-between">
-          <div class="skeleton h-3 w-16"></div>
-          <div class="skeleton h-4 w-20 !rounded-full"></div>
-        </div>
-        <div class="flex items-baseline justify-between">
-          <div class="flex flex-col gap-2">
-            <div class="skeleton h-3 w-16"></div>
-            <div class="skeleton h-8 w-32"></div>
+  <!-- ═════════ SWIPE CAROUSEL ═════════ -->
+  <div id="swipe-viewport" class="relative flex-1 overflow-hidden -mx-4">
+    <div id="swipe-track"
+         class="flex w-[500%] h-full will-change-transform carousel-transition"
+         style="transform: translate3d(0%,0,0)">
+
+      <!-- PANEL 0: DASHBOARD -->
+      <div class="w-[20%] shrink-0 px-4" data-tab-panel="dashboard">
+        <section id="tab-dashboard" class="flex flex-col gap-4 pb-4">
+
+          <div id="skeleton-dashboard" class="hidden flex-col gap-4">
+            <div class="flex items-center justify-between">
+              <div class="skeleton h-6 w-24"></div>
+              <div class="skeleton h-3 w-20"></div>
+            </div>
+            <div class="bg-surface-container-high rounded-xl p-4 flex flex-col gap-3">
+              <div class="flex items-center justify-between">
+                <div class="skeleton h-3 w-16"></div>
+                <div class="skeleton h-4 w-20 !rounded-full"></div>
+              </div>
+              <div class="flex items-baseline justify-between">
+                <div class="flex flex-col gap-2">
+                  <div class="skeleton h-3 w-16"></div>
+                  <div class="skeleton h-8 w-32"></div>
+                </div>
+                <div class="flex flex-col gap-2 items-end">
+                  <div class="skeleton h-3 w-12"></div>
+                  <div class="skeleton h-5 w-20"></div>
+                </div>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
+                <div class="skeleton h-3 w-16"></div>
+                <div class="skeleton h-5 w-20"></div>
+              </div>
+              <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
+                <div class="skeleton h-3 w-16"></div>
+                <div class="skeleton h-5 w-20"></div>
+              </div>
+              <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
+                <div class="skeleton h-3 w-16"></div>
+                <div class="skeleton h-5 w-20"></div>
+              </div>
+              <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
+                <div class="skeleton h-3 w-16"></div>
+                <div class="skeleton h-5 w-20"></div>
+              </div>
+            </div>
+            <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-3">
+              <div class="skeleton h-4 w-32"></div>
+              <div class="skeleton h-20 w-full"></div>
+            </div>
+            <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-3">
+              <div class="skeleton h-4 w-32"></div>
+              <div class="skeleton h-3 w-full"></div>
+              <div class="skeleton h-3 w-full"></div>
+              <div class="skeleton h-3 w-full"></div>
+            </div>
           </div>
-          <div class="flex flex-col gap-2 items-end">
-            <div class="skeleton h-3 w-12"></div>
-            <div class="skeleton h-5 w-20"></div>
+
+          <div id="dash-content" class="flex flex-col gap-4">
+            <div class="flex items-center justify-between">
+              <h2 class="font-headline text-xl font-semibold">Обзор</h2>
+              <span id="dash-total" class="font-mono text-[10px] text-on-surface-variant">Всего: 0 недель</span>
+            </div>
+
+            <div id="dash-last-empty" class="hidden bg-surface-container-low rounded-xl p-6 text-center">
+              <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">inbox</span>
+              <p class="text-on-surface-variant">Пока нет отчётов</p>
+              <button onclick="switchTab('calculator')" class="mt-3 px-4 py-2 rounded-lg bg-primary text-on-primary font-mono font-semibold">Перейти к расчёту</button>
+            </div>
+
+            <div id="dash-last" class="hidden flex-col gap-4">
+              <div class="bg-surface-container-high rounded-xl p-4 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                  <span id="dash-period" class="font-mono text-[11px] text-on-surface-variant uppercase">—</span>
+                  <span id="dash-platform" class="px-2 py-0.5 rounded-full bg-surface-container font-mono text-[10px] text-primary">—</span>
+                </div>
+
+                <div class="flex items-baseline justify-between">
+                  <div>
+                    <div class="font-mono text-[10px] text-on-surface-variant uppercase">На руки</div>
+                    <div id="dash-net-cash" class="font-mono text-2xl font-bold text-primary">0,00 zł</div>
+                  </div>
+
+                  <div data-mode="lite-only" class="text-right">
+                    <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нал</div>
+                    <div id="dash-hero-cash" class="font-mono text-xl font-bold text-tertiary">0,00 zł</div>
+                  </div>
+
+                  <div data-mode="pro-only" class="text-right">
+                    <div class="font-mono text-[10px] text-on-surface-variant uppercase">Профит</div>
+                    <div id="dash-net-full" class="font-mono text-xl font-bold text-secondary">0,00 zł</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-3">
+                <div class="bg-surface-container-low rounded-xl p-3">
+                  <div class="font-mono text-[10px] text-on-surface-variant uppercase">Брутто</div>
+                  <div id="dash-gross" class="font-mono text-base font-bold">0,00 zł</div>
+                </div>
+                <div class="bg-surface-container-low rounded-xl p-3">
+                  <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нетто в приложении</div>
+                  <div id="dash-net" class="font-mono text-base font-bold text-primary">0,00 zł</div>
+                </div>
+                <div class="bg-surface-container-low rounded-xl p-3">
+                  <div class="font-mono text-[10px] text-on-surface-variant uppercase">На карту</div>
+                  <div id="dash-card" class="font-mono text-base font-bold text-secondary">0,00 zł</div>
+                </div>
+                <div class="bg-surface-container-low rounded-xl p-3">
+                  <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нал</div>
+                  <div id="dash-cash" class="font-mono text-base font-bold text-tertiary">0,00 zł</div>
+                </div>
+                <div data-mode="pro-only" class="bg-surface-container-low rounded-xl p-3">
+                  <div class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</div>
+                  <div id="dash-km" class="font-mono text-base font-bold">0 км</div>
+                </div>
+                <div data-mode="pro-only" class="bg-surface-container-low rounded-xl p-3">
+                  <div class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</div>
+                  <div id="dash-fuel" class="font-mono text-base font-bold text-error">0,00 zł</div>
+                </div>
+              </div>
+
+              <div class="bg-surface-container rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <span id="dash-sparkline-title" class="font-headline text-sm font-semibold">Последние недели</span>
+                  <span class="font-mono text-[10px] text-on-surface-variant">на жизнь, PLN</span>
+                </div>
+                <div id="dash-sparkline" class="h-24 flex items-end gap-1"></div>
+              </div>
+
+              <div class="bg-surface-container-low rounded-xl p-4">
+                <div id="sum4-title" class="font-headline text-sm font-semibold mb-3">Итого за 4 недели</div>
+                <div class="flex flex-col gap-2 font-mono text-sm">
+                  <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="sum4-card" class="font-semibold">0,00 zł</span></div>
+                  <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="sum4-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
+                  <div class="flex justify-between"><span class="text-on-surface-variant">💰 На руки:</span><span id="sum4-net" class="font-semibold text-primary">0,00 zł</span></div>
+                  <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="sum4-fuel" class="font-semibold">0,00 zł</span></div>
+                  <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="sum4-full" class="font-semibold text-secondary">0,00 zł</span></div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
-          <div class="skeleton h-3 w-16"></div>
-          <div class="skeleton h-5 w-20"></div>
-        </div>
-        <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
-          <div class="skeleton h-3 w-16"></div>
-          <div class="skeleton h-5 w-20"></div>
-        </div>
-        <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
-          <div class="skeleton h-3 w-16"></div>
-          <div class="skeleton h-5 w-20"></div>
-        </div>
-        <div class="bg-surface-container-low rounded-xl p-3 flex flex-col gap-2">
-          <div class="skeleton h-3 w-16"></div>
-          <div class="skeleton h-5 w-20"></div>
-        </div>
-      </div>
-      <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-3">
-        <div class="skeleton h-4 w-32"></div>
-        <div class="skeleton h-20 w-full"></div>
-      </div>
-      <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-3">
-        <div class="skeleton h-4 w-32"></div>
-        <div class="skeleton h-3 w-full"></div>
-        <div class="skeleton h-3 w-full"></div>
-        <div class="skeleton h-3 w-full"></div>
-      </div>
-    </div>
-
-    <div id="dash-content" class="hidden flex-col gap-4">
-      <div class="flex items-center justify-between">
-        <h2 class="font-headline text-xl font-semibold">Обзор</h2>
-        <span id="dash-total" class="font-mono text-[10px] text-on-surface-variant">Всего: 0 недель</span>
+        </section>
       </div>
 
-      <div id="dash-last-empty" class="hidden bg-surface-container-low rounded-xl p-6 text-center">
-        <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">inbox</span>
-        <p class="text-on-surface-variant">Пока нет отчётов</p>
-        <button onclick="switchTab('calculator')" class="mt-3 px-4 py-2 rounded-lg bg-primary text-on-primary font-mono font-semibold">Перейти к расчёту</button>
-      </div>
-
-      <div id="dash-last" class="hidden flex-col gap-4">
-        <div class="bg-surface-container-high rounded-xl p-4 flex flex-col gap-3">
+      <!-- PANEL 1: SCREENSHOTS -->
+      <div class="w-[20%] shrink-0 px-4" data-tab-panel="screenshots">
+        <section id="tab-screenshots" class="flex flex-col gap-4 pb-4">
           <div class="flex items-center justify-between">
-            <span id="dash-period" class="font-mono text-[11px] text-on-surface-variant uppercase">—</span>
-            <span id="dash-platform" class="px-2 py-0.5 rounded-full bg-surface-container font-mono text-[10px] text-primary">—</span>
+            <h2 class="font-headline text-xl font-semibold">Очередь скринов</h2>
+            <span id="queue-count" class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] text-primary">0</span>
           </div>
 
-          <div class="flex items-baseline justify-between">
+          <label for="file-input" id="drop-zone" class="cursor-pointer bg-surface-container border-2 border-dashed border-outline-variant hover:border-primary/40 rounded-xl p-6 flex flex-col items-center gap-2 transition-all">
+            <span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
+            <div class="font-headline text-base font-semibold">Загрузить скриншоты</div>
+            <div class="font-mono text-[10px] text-on-surface-variant">PNG, JPG • один или несколько</div>
+            <input id="file-input" type="file" accept="image/*" multiple class="hidden">
+          </label>
+
+          <div id="upload-status" class="hidden rounded-lg bg-surface-container-low p-3 font-mono text-xs"></div>
+
+          <div id="skeleton-queue" class="hidden flex-col gap-3">
+            <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2">
+              <div class="flex gap-2">
+                <div class="skeleton h-4 w-16 !rounded-full"></div>
+                <div class="skeleton h-4 w-24"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-2">
+                <div class="skeleton h-3 w-full"></div>
+                <div class="skeleton h-3 w-full"></div>
+                <div class="skeleton h-3 w-full"></div>
+                <div class="skeleton h-3 w-full"></div>
+              </div>
+            </div>
+            <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2">
+              <div class="flex gap-2">
+                <div class="skeleton h-4 w-16 !rounded-full"></div>
+                <div class="skeleton h-4 w-24"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-2">
+                <div class="skeleton h-3 w-full"></div>
+                <div class="skeleton h-3 w-full"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="queue-list" class="flex flex-col gap-3"></div>
+
+          <div id="queue-empty" class="hidden text-center text-on-surface-variant py-8">
+            <span class="material-symbols-outlined text-4xl mb-2">inbox</span>
+            <p>Очередь пуста. Загрузите скриншоты от Uber / Bolt.</p>
+          </div>
+
+          <div id="queue-hint" class="hidden font-mono text-[10px] text-tertiary text-center"></div>
+
+          <button id="btn-go-calc" onclick="goToCalculation()" disabled
+                  class="w-full h-12 rounded-xl bg-secondary text-on-secondary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
+            <span class="material-symbols-outlined">calculate</span>
+            Рассчитать
+          </button>
+
+          <button id="btn-clear-queue" onclick="clearQueue()" disabled
+                  class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
+            <span class="material-symbols-outlined text-base">delete_sweep</span>
+            Удалить все скрины
+          </button>
+        </section>
+      </div>
+
+      <!-- PANEL 2: CALCULATOR -->
+      <div class="w-[20%] shrink-0 px-4" data-tab-panel="calculator">
+        <section id="tab-calculator" class="flex flex-col gap-4 pb-4">
+          <div class="flex items-center justify-between">
+            <h2 class="font-headline text-xl font-semibold">Расчёт недели</h2>
+            <button onclick="loadCalcDefaults(true)" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
+          </div>
+
+          <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
             <div>
-              <div class="font-mono text-[10px] text-on-surface-variant uppercase">На руки</div>
-              <div id="dash-net-cash" class="font-mono text-2xl font-bold text-primary">0,00 zł</div>
+              <div class="font-mono text-[10px] text-on-surface-variant uppercase">Реальный профит</div>
+              <div id="calc-hero-net" class="font-mono text-2xl font-bold text-primary">0,00 zł</div>
             </div>
-
-            <div data-mode="lite-only" class="text-right">
-              <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нал</div>
-              <div id="dash-hero-cash" class="font-mono text-xl font-bold text-tertiary">0,00 zł</div>
-            </div>
-
-            <div data-mode="pro-only" class="text-right">
-              <div class="font-mono text-[10px] text-on-surface-variant uppercase">Профит</div>
-              <div id="dash-net-full" class="font-mono text-xl font-bold text-secondary">0,00 zł</div>
+            <div class="text-right">
+              <div class="font-mono text-[10px] text-on-surface-variant uppercase">На карту</div>
+              <div id="calc-hero-card" class="font-mono text-base font-bold text-secondary">0,00 zł</div>
             </div>
           </div>
-        </div>
 
-        <div class="grid grid-cols-2 gap-3">
-          <div class="bg-surface-container-low rounded-xl p-3">
-            <div class="font-mono text-[10px] text-on-surface-variant uppercase">Брутто</div>
-            <div id="dash-gross" class="font-mono text-base font-bold">0,00 zł</div>
+          <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="font-mono text-[10px] text-on-surface-variant uppercase">Брутто (из скринов)</label>
+              <div class="relative">
+                <input id="in-gross" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label class="font-mono text-[10px] text-on-surface-variant uppercase">Нетто (из скринов)</label>
+              <div class="relative">
+                <input id="in-net" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+              </div>
+            </div>
+
+            <div data-calc-pro-only class="flex flex-col gap-1">
+              <label class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</label>
+              <div class="relative">
+                <input id="in-km" type="number" step="1" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">км</span>
+              </div>
+            </div>
+
+            <div data-calc-pro-only class="flex flex-col gap-1">
+              <label class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</label>
+              <div class="relative">
+                <input id="in-fuel" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+              </div>
+              <label class="flex items-center gap-2 mt-1 cursor-pointer">
+                <input id="in-fuel-toggle" type="checkbox" checked class="accent-primary">
+                <span class="font-mono text-[10px] text-on-surface-variant">Вычесть из прибыли</span>
+              </label>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label class="font-mono text-[10px] text-on-surface-variant uppercase">Наличные (из скринов)</label>
+              <div class="relative">
+                <input id="in-cash" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-1">
+              <label class="font-mono text-[10px] text-on-surface-variant uppercase">База налога на бонус (из сообщения партнёра)</label>
+              <div class="relative">
+                <input id="in-promo-base" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+              </div>
+            </div>
+
+            <div data-calc-pro-only class="flex flex-col gap-1">
+              <label class="font-mono text-[10px] text-on-surface-variant uppercase">Ставка амортизации</label>
+              <div class="relative">
+                <input id="in-dep-rate" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0.50" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
+                <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł/км</span>
+              </div>
+            </div>
+
+            <label class="flex items-center justify-between bg-surface-container rounded-lg p-3 cursor-pointer">
+              <span class="font-body text-sm">Вычесть ZUS</span>
+              <input id="in-zus-toggle" type="checkbox" class="accent-primary w-5 h-5">
+            </label>
           </div>
-          <div class="bg-surface-container-low rounded-xl p-3">
-            <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нетто в приложении</div>
-            <div id="dash-net" class="font-mono text-base font-bold text-primary">0,00 zł</div>
+
+          <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2 font-mono text-sm">
+            <div class="flex justify-between"><span class="text-on-surface-variant">Брутто:</span><span id="p-gross" class="font-semibold">0,00 zł</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">Нетто:</span><span id="p-net-input" class="font-semibold">0,00 zł</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">Партнёрка:</span><span id="p-vat" class="text-error">0,00 zł</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">Налог на бонус:</span><span id="p-bonustax" class="text-error">0,00 zł</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">Недельная комиссия:</span><span id="p-fee" class="text-error">0,00 zł</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">ZUS:</span><span id="p-zus" class="text-error">0,00 zł</span></div>
+            <div class="flex justify-between"><span class="text-on-surface-variant">Наличные:</span><span id="p-cash" class="text-tertiary">0,00 zł</span></div>
+            <div class="flex justify-between bg-surface-container-high rounded-lg p-2 mt-1">
+              <span class="text-secondary">💳 К выплате на карту:</span>
+              <span id="p-card" class="text-secondary font-bold">0,00 zł</span>
+            </div>
+            <div data-calc-pro-only class="flex justify-between mt-2"><span class="text-on-surface-variant">Топливо:</span><span id="p-fuel" class="text-error">0,00 zł</span></div>
+            <div data-calc-pro-only class="flex justify-between"><span class="text-on-surface-variant">Амортизация:</span><span id="p-dep" class="text-error">0,00 zł</span></div>
+            <div class="flex justify-between bg-surface-container-lowest rounded-lg p-3 mt-2">
+              <span class="font-headline text-sm">Реальный профит:</span>
+              <span id="p-net" class="font-mono text-xl font-bold text-primary">0,00 zł</span>
+            </div>
           </div>
-          <div class="bg-surface-container-low rounded-xl p-3">
-            <div class="font-mono text-[10px] text-on-surface-variant uppercase">На карту</div>
-            <div id="dash-card" class="font-mono text-base font-bold text-secondary">0,00 zł</div>
+
+          <button onclick="saveReport()" class="w-full h-12 rounded-xl bg-primary hover:bg-primary-fixed text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
+            <span class="material-symbols-outlined">save</span>
+            Сохранить
+          </button>
+        </section>
+      </div>
+
+      <!-- PANEL 3: HISTORY -->
+      <div class="w-[20%] shrink-0 px-4" data-tab-panel="history">
+        <section id="tab-history" class="flex flex-col gap-4 pb-4">
+          <div id="skeleton-history" class="hidden flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <div class="skeleton h-6 w-24"></div>
+              <div class="skeleton h-3 w-16"></div>
+            </div>
+            <div class="skeleton h-20 w-full"></div>
+            <div class="skeleton h-20 w-full"></div>
+            <div class="skeleton h-20 w-full"></div>
           </div>
-          <div class="bg-surface-container-low rounded-xl p-3">
-            <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нал</div>
-            <div id="dash-cash" class="font-mono text-base font-bold text-tertiary">0,00 zł</div>
+
+          <div id="history-content" class="flex flex-col gap-3">
+            <div class="flex items-center justify-between">
+              <h2 class="font-headline text-xl font-semibold">История</h2>
+              <span id="history-count" class="font-mono text-[10px] text-on-surface-variant">0 отчётов</span>
+            </div>
+
+            <div id="history-list" class="flex flex-col gap-3"></div>
+
+            <div id="history-empty" class="hidden bg-surface-container-low rounded-xl p-6 text-center">
+              <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">history</span>
+              <p class="text-on-surface-variant">Пока нет отчётов</p>
+              <button onclick="switchTab('calculator')" class="mt-3 px-4 py-2 rounded-lg bg-primary text-on-primary font-mono font-semibold">Перейти к расчёту</button>
+            </div>
+
+            <div id="history-summary" class="hidden bg-surface-container-low rounded-xl p-4">
+              <div id="history-summary-title" class="font-headline text-sm font-semibold mb-3">Итого</div>
+              <div class="flex flex-col gap-2 font-mono text-sm">
+                <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="hist-sum-card" class="font-semibold">0,00 zł</span></div>
+                <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="hist-sum-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
+                <div class="flex justify-between"><span class="text-on-surface-variant">💰 На руки:</span><span id="hist-sum-net" class="font-semibold text-primary">0,00 zł</span></div>
+                <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="hist-sum-fuel" class="font-semibold">0,00 zł</span></div>
+                <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="hist-sum-full" class="font-semibold text-secondary">0,00 zł</span></div>
+              </div>
+            </div>
           </div>
-          <div data-mode="pro-only" class="bg-surface-container-low rounded-xl p-3">
-            <div class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</div>
-            <div id="dash-km" class="font-mono text-base font-bold">0 км</div>
+        </section>
+      </div>
+
+      <!-- PANEL 4: SETTINGS -->
+      <div class="w-[20%] shrink-0 px-4" data-tab-panel="settings">
+        <section id="tab-settings" class="flex flex-col gap-4 pb-4">
+          <div id="skeleton-settings" class="hidden flex-col gap-4">
+            <div class="skeleton h-6 w-32"></div>
+            <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+            </div>
           </div>
-          <div data-mode="pro-only" class="bg-surface-container-low rounded-xl p-3">
-            <div class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</div>
-            <div id="dash-fuel" class="font-mono text-base font-bold text-error">0,00 zł</div>
+
+          <div id="settings-content" class="flex flex-col gap-4">
+            <h2 class="font-headline text-xl font-semibold">Настройки</h2>
+
+            <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[10px] text-on-surface-variant uppercase">Режим</label>
+                <div class="bg-surface-container-high rounded-full p-0.5 flex">
+                  <button id="set-lite" class="flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all">Lite</button>
+                  <button id="set-pro"  class="flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all">Pro</button>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[10px] text-on-surface-variant uppercase">Партнёрка %</label>
+                <input id="set-partner-pct" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="5" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[10px] text-on-surface-variant uppercase">База партнёрки</label>
+                <div class="bg-surface-container-high rounded-full p-0.5 flex">
+                  <button id="set-base-gross" class="flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all">gross</button>
+                  <button id="set-base-net"   class="flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all">net</button>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[10px] text-on-surface-variant uppercase">Налог на бонусы %</label>
+                <input id="set-promo-tax" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="23" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[10px] text-on-surface-variant uppercase">Недельная комиссия партнёра (PLN)</label>
+                <input id="set-weekly-fee" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="60" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[10px] text-on-surface-variant uppercase">ZUS (PLN)</label>
+                <input id="set-zus" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="350" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+              </div>
+
+              <div class="flex flex-col gap-1">
+                <label class="font-mono text-[10px] text-on-surface-variant uppercase">Амортизация (PLN/км)</label>
+                <input id="set-dep-rate" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0.50" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
+              </div>
+            </div>
+
+            <button id="btn-save-settings" onclick="saveSettings()" class="w-full h-12 rounded-xl bg-primary text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
+              <span class="material-symbols-outlined">save</span>
+              <span id="btn-save-settings-text">Сохранить настройки</span>
+            </button>
+
+            <button onclick="resetSettings()" class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2">
+              <span class="material-symbols-outlined text-base">restart_alt</span>
+              Сбросить к дефолту
+            </button>
           </div>
-        </div>
-
-        <div class="bg-surface-container rounded-xl p-4">
-          <div class="flex items-center justify-between mb-3">
-            <span id="dash-sparkline-title" class="font-headline text-sm font-semibold">Последние недели</span>
-            <span class="font-mono text-[10px] text-on-surface-variant">на жизнь, PLN</span>
-          </div>
-          <div id="dash-sparkline" class="h-24 flex items-end gap-1"></div>
-        </div>
-
-        <div class="bg-surface-container-low rounded-xl p-4">
-          <div id="sum4-title" class="font-headline text-sm font-semibold mb-3">Итого за 4 недели</div>
-          <div class="flex flex-col gap-2 font-mono text-sm">
-            <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="sum4-card" class="font-semibold">0,00 zł</span></div>
-            <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="sum4-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
-            <div class="flex justify-between"><span class="text-on-surface-variant">💰 На руки:</span><span id="sum4-net" class="font-semibold text-primary">0,00 zł</span></div>
-            <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="sum4-fuel" class="font-semibold">0,00 zł</span></div>
-            <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="sum4-full" class="font-semibold text-secondary">0,00 zł</span></div>
-          </div>
-        </div>
+        </section>
       </div>
+
     </div>
-  </section>
-
-  <!-- ═════════ TAB: SCREENSHOTS ═════════ -->
-  <section id="tab-screenshots" class="hidden flex-col gap-4">
-    <div class="flex items-center justify-between">
-      <h2 class="font-headline text-xl font-semibold">Очередь скринов</h2>
-      <span id="queue-count" class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] text-primary">0</span>
-    </div>
-
-    <label for="file-input" id="drop-zone" class="cursor-pointer bg-surface-container border-2 border-dashed border-outline-variant hover:border-primary/40 rounded-xl p-6 flex flex-col items-center gap-2 transition-all">
-      <span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
-      <div class="font-headline text-base font-semibold">Загрузить скриншоты</div>
-      <div class="font-mono text-[10px] text-on-surface-variant">PNG, JPG • один или несколько</div>
-      <input id="file-input" type="file" accept="image/*" multiple class="hidden">
-    </label>
-
-    <div id="upload-status" class="hidden rounded-lg bg-surface-container-low p-3 font-mono text-xs"></div>
-
-    <div id="skeleton-queue" class="hidden flex-col gap-3">
-      <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2">
-        <div class="flex gap-2">
-          <div class="skeleton h-4 w-16 !rounded-full"></div>
-          <div class="skeleton h-4 w-24"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-2 mt-2">
-          <div class="skeleton h-3 w-full"></div>
-          <div class="skeleton h-3 w-full"></div>
-          <div class="skeleton h-3 w-full"></div>
-          <div class="skeleton h-3 w-full"></div>
-        </div>
-      </div>
-      <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2">
-        <div class="flex gap-2">
-          <div class="skeleton h-4 w-16 !rounded-full"></div>
-          <div class="skeleton h-4 w-24"></div>
-        </div>
-        <div class="grid grid-cols-2 gap-2 mt-2">
-          <div class="skeleton h-3 w-full"></div>
-          <div class="skeleton h-3 w-full"></div>
-        </div>
-      </div>
-    </div>
-
-    <div id="queue-list" class="flex flex-col gap-3"></div>
-
-    <div id="queue-empty" class="hidden text-center text-on-surface-variant py-8">
-      <span class="material-symbols-outlined text-4xl mb-2">inbox</span>
-      <p>Очередь пуста. Загрузите скриншоты от Uber / Bolt.</p>
-    </div>
-
-    <div id="queue-hint" class="hidden font-mono text-[10px] text-tertiary text-center"></div>
-
-    <button id="btn-go-calc" onclick="goToCalculation()" disabled
-            class="w-full h-12 rounded-xl bg-secondary text-on-secondary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
-      <span class="material-symbols-outlined">calculate</span>
-      Рассчитать
-    </button>
-
-    <button id="btn-clear-queue" onclick="clearQueue()" disabled
-            class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
-      <span class="material-symbols-outlined text-base">delete_sweep</span>
-      Удалить все скрины
-    </button>
-  </section>
-
-  <!-- ═════════ TAB: CALCULATOR ═════════ -->
-  <section id="tab-calculator" class="hidden flex-col gap-4">
-    <div class="flex items-center justify-between">
-      <h2 class="font-headline text-xl font-semibold">Расчёт недели</h2>
-      <button onclick="loadCalcDefaults(true)" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
-    </div>
-
-    <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
-      <div>
-        <div class="font-mono text-[10px] text-on-surface-variant uppercase">Реальный профит</div>
-        <div id="calc-hero-net" class="font-mono text-2xl font-bold text-primary">0,00 zł</div>
-      </div>
-      <div class="text-right">
-        <div class="font-mono text-[10px] text-on-surface-variant uppercase">На карту</div>
-        <div id="calc-hero-card" class="font-mono text-base font-bold text-secondary">0,00 zł</div>
-      </div>
-    </div>
-
-    <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
-      <div class="flex flex-col gap-1">
-        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Брутто (из скринов)</label>
-        <div class="relative">
-          <input id="in-gross" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
-        </div>
-      </div>
-
-      <div class="flex flex-col gap-1">
-        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Нетто (из скринов)</label>
-        <div class="relative">
-          <input id="in-net" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
-        </div>
-      </div>
-
-      <div data-calc-pro-only class="flex flex-col gap-1">
-        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Пробег</label>
-        <div class="relative">
-          <input id="in-km" type="number" step="1" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">км</span>
-        </div>
-      </div>
-
-      <div data-calc-pro-only class="flex flex-col gap-1">
-        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Топливо</label>
-        <div class="relative">
-          <input id="in-fuel" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
-        </div>
-        <label class="flex items-center gap-2 mt-1 cursor-pointer">
-          <input id="in-fuel-toggle" type="checkbox" checked class="accent-primary">
-          <span class="font-mono text-[10px] text-on-surface-variant">Вычесть из прибыли</span>
-        </label>
-      </div>
-
-      <div class="flex flex-col gap-1">
-        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Наличные (из скринов)</label>
-        <div class="relative">
-          <input id="in-cash" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" readonly class="w-full bg-surface-container-lowest text-on-surface-variant font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none cursor-not-allowed">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
-        </div>
-      </div>
-
-      <div class="flex flex-col gap-1">
-        <label class="font-mono text-[10px] text-on-surface-variant uppercase">База налога на бонус (из сообщения партнёра)</label>
-        <div class="relative">
-          <input id="in-promo-base" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
-        </div>
-      </div>
-
-      <div data-calc-pro-only class="flex flex-col gap-1">
-        <label class="font-mono text-[10px] text-on-surface-variant uppercase">Ставка амортизации</label>
-        <div class="relative">
-          <input id="in-dep-rate" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0.50" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none focus:bg-surface-container">
-          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-on-surface-variant pointer-events-none">zł/км</span>
-        </div>
-      </div>
-
-      <label class="flex items-center justify-between bg-surface-container rounded-lg p-3 cursor-pointer">
-        <span class="font-body text-sm">Вычесть ZUS</span>
-        <input id="in-zus-toggle" type="checkbox" class="accent-primary w-5 h-5">
-      </label>
-    </div>
-
-    <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2 font-mono text-sm">
-      <div class="flex justify-between"><span class="text-on-surface-variant">Брутто:</span><span id="p-gross" class="font-semibold">0,00 zł</span></div>
-      <div class="flex justify-between"><span class="text-on-surface-variant">Нетто:</span><span id="p-net-input" class="font-semibold">0,00 zł</span></div>
-      <div class="flex justify-between"><span class="text-on-surface-variant">Партнёрка:</span><span id="p-vat" class="text-error">0,00 zł</span></div>
-      <div class="flex justify-between"><span class="text-on-surface-variant">Налог на бонус:</span><span id="p-bonustax" class="text-error">0,00 zł</span></div>
-      <div class="flex justify-between"><span class="text-on-surface-variant">Недельная комиссия:</span><span id="p-fee" class="text-error">0,00 zł</span></div>
-      <div class="flex justify-between"><span class="text-on-surface-variant">ZUS:</span><span id="p-zus" class="text-error">0,00 zł</span></div>
-      <div class="flex justify-between"><span class="text-on-surface-variant">Наличные:</span><span id="p-cash" class="text-tertiary">0,00 zł</span></div>
-      <div class="flex justify-between bg-surface-container-high rounded-lg p-2 mt-1">
-        <span class="text-secondary">💳 К выплате на карту:</span>
-        <span id="p-card" class="text-secondary font-bold">0,00 zł</span>
-      </div>
-      <div data-calc-pro-only class="flex justify-between mt-2"><span class="text-on-surface-variant">Топливо:</span><span id="p-fuel" class="text-error">0,00 zł</span></div>
-      <div data-calc-pro-only class="flex justify-between"><span class="text-on-surface-variant">Амортизация:</span><span id="p-dep" class="text-error">0,00 zł</span></div>
-      <div class="flex justify-between bg-surface-container-lowest rounded-lg p-3 mt-2">
-        <span class="font-headline text-sm">Реальный профит:</span>
-        <span id="p-net" class="font-mono text-xl font-bold text-primary">0,00 zł</span>
-      </div>
-    </div>
-
-    <button onclick="saveReport()" class="w-full h-12 rounded-xl bg-primary hover:bg-primary-fixed text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-transform">
-      <span class="material-symbols-outlined">save</span>
-      Сохранить
-    </button>
-  </section>
-
-  <!-- ═════════ TAB: HISTORY ═════════ -->
-  <section id="tab-history" class="hidden flex-col gap-4">
-    <div id="skeleton-history" class="hidden flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <div class="skeleton h-6 w-24"></div>
-        <div class="skeleton h-3 w-16"></div>
-      </div>
-      <div class="skeleton h-20 w-full"></div>
-      <div class="skeleton h-20 w-full"></div>
-      <div class="skeleton h-20 w-full"></div>
-    </div>
-
-    <div id="history-content" class="hidden flex-col gap-3">
-      <div class="flex items-center justify-between">
-        <h2 class="font-headline text-xl font-semibold">История</h2>
-        <span id="history-count" class="font-mono text-[10px] text-on-surface-variant">0 отчётов</span>
-      </div>
-
-      <div id="history-list" class="flex flex-col gap-3"></div>
-
-      <div id="history-empty" class="hidden bg-surface-container-low rounded-xl p-6 text-center">
-        <span class="material-symbols-outlined text-4xl text-on-surface-variant mb-2">history</span>
-        <p class="text-on-surface-variant">Пока нет отчётов</p>
-        <button onclick="switchTab('calculator')" class="mt-3 px-4 py-2 rounded-lg bg-primary text-on-primary font-mono font-semibold">Перейти к расчёту</button>
-      </div>
-
-      <div id="history-summary" class="hidden bg-surface-container-low rounded-xl p-4">
-        <div id="history-summary-title" class="font-headline text-sm font-semibold mb-3">Итого</div>
-        <div class="flex flex-col gap-2 font-mono text-sm">
-          <div class="flex justify-between"><span class="text-on-surface-variant">💳 Карта:</span><span id="hist-sum-card" class="font-semibold">0,00 zł</span></div>
-          <div class="flex justify-between"><span class="text-on-surface-variant">💵 Нал:</span><span id="hist-sum-cash" class="font-semibold text-tertiary">0,00 zł</span></div>
-          <div class="flex justify-between"><span class="text-on-surface-variant">💰 На руки:</span><span id="hist-sum-net" class="font-semibold text-primary">0,00 zł</span></div>
-          <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">⛽ Минус топливо:</span><span id="hist-sum-fuel" class="font-semibold">0,00 zł</span></div>
-          <div data-mode="pro-only" class="flex justify-between"><span class="text-on-surface-variant">💸 Минус аморт.:</span><span id="hist-sum-full" class="font-semibold text-secondary">0,00 zł</span></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ═════════ TAB: SETTINGS ═════════ -->
-  <section id="tab-settings" class="hidden flex-col gap-4">
-    <div id="skeleton-settings" class="hidden flex-col gap-4">
-      <div class="skeleton h-6 w-32"></div>
-      <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-      </div>
-    </div>
-
-    <div id="settings-content" class="hidden flex-col gap-4">
-      <h2 class="font-headline text-xl font-semibold">Настройки</h2>
-
-      <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
-        <div class="flex flex-col gap-1">
-          <label class="font-mono text-[10px] text-on-surface-variant uppercase">Режим</label>
-          <div class="bg-surface-container-high rounded-full p-0.5 flex">
-            <button id="set-lite" class="flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all">Lite</button>
-            <button id="set-pro"  class="flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all">Pro</button>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="font-mono text-[10px] text-on-surface-variant uppercase">Партнёрка %</label>
-          <input id="set-partner-pct" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="5" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="font-mono text-[10px] text-on-surface-variant uppercase">База партнёрки</label>
-          <div class="bg-surface-container-high rounded-full p-0.5 flex">
-            <button id="set-base-gross" class="flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all">gross</button>
-            <button id="set-base-net"   class="flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all">net</button>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="font-mono text-[10px] text-on-surface-variant uppercase">Налог на бонусы %</label>
-          <input id="set-promo-tax" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="23" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="font-mono text-[10px] text-on-surface-variant uppercase">Недельная комиссия партнёра (PLN)</label>
-          <input id="set-weekly-fee" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="60" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="font-mono text-[10px] text-on-surface-variant uppercase">ZUS (PLN)</label>
-          <input id="set-zus" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="350" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
-        </div>
-
-        <div class="flex flex-col gap-1">
-          <label class="font-mono text-[10px] text-on-surface-variant uppercase">Амортизация (PLN/км)</label>
-          <input id="set-dep-rate" type="number" step="0.01" inputmode="decimal" autocomplete="off" value="0.50" class="w-full bg-surface-container-lowest text-on-surface font-mono text-base px-3 py-2.5 rounded-lg focus:outline-none">
-        </div>
-      </div>
-
-      <button id="btn-save-settings" onclick="saveSettings()" class="w-full h-12 rounded-xl bg-primary text-on-primary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all">
-        <span class="material-symbols-outlined">save</span>
-        <span id="btn-save-settings-text">Сохранить настройки</span>
-      </button>
-
-      <button onclick="resetSettings()" class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2">
-        <span class="material-symbols-outlined text-base">restart_alt</span>
-        Сбросить к дефолту
-      </button>
-    </div>
-  </section>
+  </div>
+  <!-- ═════════ END SWIPE CAROUSEL ═════════ -->
 
 </main>
 
@@ -573,23 +612,23 @@ tailwind.config = {
   <div class="liquid-glass-tabbar relative rounded-[28px] p-1.5 flex items-center justify-between shadow-2xl shadow-black/60 select-none" id="tabbar-container">
     <div class="pointer-events-none absolute tab-indicator-spring rounded-2xl bg-emerald-500/20 border border-emerald-400/35 shadow-[0_0_18px_rgba(16,185,129,0.3)] inset-y-1.5 z-0 opacity-0" id="tab-pill"></div>
 
-    <button onclick="switchTab('dashboard')" data-tab="dashboard" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-emerald-400 transition-all duration-200 active:scale-90 focus:outline-none">
+    <button onclick="switchTab('dashboard')" data-tab="dashboard" data-tab-index="0" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-emerald-400 transition-all duration-200 active:scale-90 focus:outline-none">
       <span class="material-symbols-outlined text-[20px] mb-0.5 transition-transform duration-200 scale-105">dashboard</span>
       <span class="text-[11px] tracking-tight leading-none font-semibold">Обзор</span>
     </button>
-    <button onclick="switchTab('screenshots')" data-tab="screenshots" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
+    <button onclick="switchTab('screenshots')" data-tab="screenshots" data-tab-index="1" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
       <span class="material-symbols-outlined text-[20px] mb-0.5 transition-transform duration-200 scale-100">document_scanner</span>
       <span class="text-[11px] tracking-tight leading-none font-medium">Скрины</span>
     </button>
-    <button onclick="switchTab('calculator')" data-tab="calculator" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
+    <button onclick="switchTab('calculator')" data-tab="calculator" data-tab-index="2" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
       <span class="material-symbols-outlined text-[20px] mb-0.5 transition-transform duration-200 scale-100">calculate</span>
       <span class="text-[11px] tracking-tight leading-none font-medium">Расчёт</span>
     </button>
-    <button onclick="switchTab('history')" data-tab="history" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
+    <button onclick="switchTab('history')" data-tab="history" data-tab-index="3" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
       <span class="material-symbols-outlined text-[20px] mb-0.5 transition-transform duration-200 scale-100">history</span>
       <span class="text-[11px] tracking-tight leading-none font-medium">История</span>
     </button>
-    <button onclick="switchTab('settings')" data-tab="settings" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
+    <button onclick="switchTab('settings')" data-tab="settings" data-tab-index="4" class="tab-btn relative z-10 flex-1 flex flex-col items-center justify-center py-1.5 px-0.5 rounded-2xl text-slate-400 transition-all duration-200 active:scale-90 focus:outline-none">
       <span class="material-symbols-outlined text-[20px] mb-0.5 transition-transform duration-200 scale-100">tune</span>
       <span class="text-[11px] tracking-tight leading-none font-medium">Настройки</span>
     </button>
