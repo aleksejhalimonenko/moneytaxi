@@ -1482,7 +1482,7 @@ function renderHistory(list) {
             </div>
             <div class="space-y-1.5 text-xs">
               <div class="flex justify-between items-center">
-                <span class="text-slate-400">Партнёрка</span>
+                <span class="text-slate-400">Партнёрка (${(r.partnerPct * 100).toFixed(2)}%)</span>
                 <span class="font-medium text-app-danger tabular-nums">-${fmt(r.partnerVat)}</span>
               </div>
               <div class="flex justify-between items-center">
