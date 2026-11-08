@@ -19,6 +19,7 @@ tailwind.config = {
   darkMode: "class",
   theme: { extend: {
     colors: {
+      // ─── Твои существующие цвета ───
       "surface":"#10141a","surface-dim":"#10141a",
       "surface-container-lowest":"#0a0e14","surface-container-low":"#181c22",
       "surface-container":"#1c2026","surface-container-high":"#262a31",
@@ -33,7 +34,18 @@ tailwind.config = {
       "tertiary-container":"#ffbe36","on-tertiary-container":"#6f4e00",
       "error":"#ffb4ab","on-error":"#690005","error-container":"#93000a",
       "outline":"#849589","outline-variant":"#3b4a41",
-      "background":"#10141a","on-background":"#dfe2eb"
+      "background":"#10141a","on-background":"#dfe2eb",
+
+      // ─── НОВЫЕ цвета из прототипа истории ───
+      "app": {
+        "bg":      "#0A0E17",
+        "card":    "#131B26",
+        "surface": "#1A2332",
+        "border":  "#243044",
+        "accent":  "#10B981",
+        "danger":  "#F43F5E",
+        "subtext": "#8E9BAE"
+      }
     },
     fontFamily: {
       "headline":"Space Grotesk","body":"Inter","mono":"JetBrains Mono"
@@ -41,6 +53,7 @@ tailwind.config = {
   }}
 };
 </script>
+
 <style>
   html, body { background:#10141a; color:#dfe2eb; }
   html { min-height: -webkit-fill-available; }
