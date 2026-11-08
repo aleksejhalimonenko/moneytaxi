@@ -11,7 +11,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v30.1';
+const APP_VERSION = 'v30.2';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -138,7 +138,7 @@ function markSettingsDirty() {
   const btn = document.getElementById('btn-save-settings');
   const txt = document.getElementById('btn-save-settings-text');
   if (btn) {
-    btn.classList.remove('bg-primary', 'text-on-primary');
+    btn.classList.remove('bg-primary', 'text-on-primary', 'shadow-[0_0_18px_rgba(109,255,186,0.35)]');
     btn.classList.add('bg-tertiary-container', 'text-on-tertiary-container');
   }
   if (txt) txt.textContent = 'Сохранить изменения';
@@ -150,7 +150,7 @@ function clearSettingsDirty() {
   const txt = document.getElementById('btn-save-settings-text');
   if (btn) {
     btn.classList.remove('bg-tertiary-container', 'text-on-tertiary-container');
-    btn.classList.add('bg-primary', 'text-on-primary');
+    btn.classList.add('bg-primary', 'text-on-primary', 'shadow-[0_0_18px_rgba(109,255,186,0.35)]');
   }
   if (txt) txt.textContent = 'Сохранить настройки';
 }
@@ -1703,8 +1703,11 @@ function setActiveMode(mode) {
   const hLite = document.getElementById('hdr-lite');
   const hPro  = document.getElementById('hdr-pro');
 
-  const onSet  = 'flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all bg-primary text-on-primary';
-  const offSet = 'flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all text-on-surface-variant';
+  // Кнопки в панели настроек — компактные
+  const onSet  = 'flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]';
+  const offSet = 'flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white';
+
+  // Кнопки в шапке — как были
   const onHdr  = 'px-2 py-1 rounded-full bg-primary text-on-primary font-mono text-[10px] font-bold uppercase transition-all';
   const offHdr = 'px-2 py-1 rounded-full text-on-surface-variant font-mono text-[10px] font-semibold uppercase hover:text-on-surface transition-all';
 
@@ -1718,6 +1721,19 @@ function setActiveMode(mode) {
   }
 
   if (typeof applyCalcMode === 'function') applyCalcMode(mode);
+}
+
+function setActiveBase(base) {
+  currentBase = base;
+  const g = document.getElementById('set-base-gross');
+  const n = document.getElementById('set-base-net');
+  if (!g || !n) return;
+
+  const on  = 'flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]';
+  const off = 'flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white';
+
+  g.className = base === 'gross' ? on : off;
+  n.className = base === 'net'   ? on : off;
 }
 
 function setActiveBase(base) {
