@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v30.0 — swipe-карусель между вкладками,
-           двусторонняя синхронизация с таб-баром
+   v30.1 — stacked bar chart в dashboard,
+           swipe-карусель, двусторонняя синхронизация
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -11,7 +11,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v30.0';
+const APP_VERSION = 'v30.1';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -542,6 +542,106 @@ function bindSwipeGestures() {
   });
 }
 
+// ═══════════════════════════════════════════════════
+//   STACKED BAR CHART (dashboard)
+// ═══════════════════════════════════════════════════
+
+let _sparkData = [];
+
+/** Обновляет тултип + подсветку активного столбика */
+function showChartDetail(index) {
+  const s = _sparkData[index];
+  if (!s) return;
+
+  const netCash = Math.round(Number(s.netCash) || 0);
+  const net     = Math.round(Number(s.net)     || 0);
+  const gross   = Math.round(Number(s.gross)   || 0);
+  const fuel    = Math.round(Number(s.fuel)    || 0);
+
+  const set = (id, text) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+  };
+
+  set('tip-week',    s.period || '—');
+  set('tip-netcash', netCash.toLocaleString('ru-RU') + ' zł');
+  set('tip-net',     net.toLocaleString('ru-RU')     + ' zł');
+  set('tip-gross',   gross.toLocaleString('ru-RU')   + ' zł');
+  set('tip-fuel',    (fuel > 0 ? '-' : '') + fuel.toLocaleString('ru-RU') + ' zł');
+
+  document.querySelectorAll('.chart-col').forEach((col, i) => {
+    col.classList.toggle('selected', i === index);
+  });
+}
+window.showChartDetail = showChartDetail;
+
+/** Рисует stacked bar chart в #dash-sparkline */
+function renderSparkline(spark, isLite) {
+  const container = document.getElementById('dash-sparkline');
+  if (!container) return;
+
+  _sparkData = Array.isArray(spark) ? spark : [];
+
+  if (!_sparkData.length) {
+    container.innerHTML = '<div class="w-full text-center text-on-surface-variant font-mono text-[10px] py-4">нет данных</div>';
+    return;
+  }
+
+  const MAX_H = 138; // px — максимальная высота столбика
+
+  // Общая нормализация — по (gross + fuel) для Pro, по gross для Lite
+  const totals = _sparkData.map(s => {
+    const g = Number(s.gross) || 0;
+    const f = isLite ? 0 : (Number(s.fuel) || 0);
+    return g + f;
+  });
+  const maxTotal = Math.max(1, ...totals);
+
+  container.innerHTML = _sparkData.map((s, i) => {
+    const isLast = i === _sparkData.length - 1;
+
+    const gross   = Number(s.gross)   || 0;
+    const net     = Number(s.net)     || 0;
+    const netCash = Number(s.netCash) || 0;
+    const fuel    = isLite ? 0 : (Number(s.fuel) || 0);
+
+    // Сегменты (защита от отрицательных значений)
+    const skyH     = Math.max(0, ((gross - net)   / maxTotal) * MAX_H);
+    const emeraldH = Math.max(0, ((net - netCash) / maxTotal) * MAX_H);
+    const mintH    = Math.max(0, (netCash        / maxTotal) * MAX_H);
+    const roseH    = Math.max(0, (fuel           / maxTotal) * MAX_H);
+
+    const totalH = Math.max(4, skyH + emeraldH + mintH + roseH);
+
+    const label      = Math.round(netCash);
+    const weekLabel  = (s.period || '').substring(0, 9);
+    const labelClass = isLast
+      ? 'text-[#6dffba] font-bold ring-1 ring-primary/40 rounded px-0.5 bg-primary/10'
+      : 'text-primary font-bold';
+    const wrapperClass = isLast
+      ? 'ring-2 ring-primary/50 shadow-[0_0_14px_rgba(109,255,186,0.35)]'
+      : '';
+    const weekClass = isLast ? 'text-primary font-semibold' : 'text-slate-400';
+
+    return `
+      <div class="chart-col flex-1 flex flex-col items-center justify-end h-full cursor-pointer ${isLast ? 'selected' : ''}"
+           onclick="showChartDetail(${i})">
+        <div class="font-mono text-[9px] ${labelClass} mb-1 leading-none">${label}</div>
+        <div class="w-full flex flex-col rounded-t-[5px] overflow-hidden bg-slate-800/40 p-[1px] border border-white/5 ${wrapperClass}"
+             style="height: ${totalH}px">
+          <div class="w-full bg-sky-500/20 border-b border-sky-400/30" style="height: ${skyH}px"></div>
+          <div class="w-full bg-gradient-to-t from-emerald-600 to-emerald-500/90 border-b border-white/10" style="height: ${emeraldH}px"></div>
+          <div class="w-full bg-[#6dffba]" style="height: ${mintH}px"></div>
+          ${roseH > 0 ? `<div class="w-full bg-gradient-to-t from-rose-600 to-rose-400" style="height: ${roseH}px"></div>` : ''}
+        </div>
+        <span class="font-mono text-[8px] ${weekClass} mt-1.5 scale-90 origin-top">${esc(weekLabel)}</span>
+      </div>`;
+  }).join('');
+
+  // Автовыбор последней недели
+  showChartDetail(_sparkData.length - 1);
+}
+
 // === Dashboard ===
 async function fetchDashboard() {
   return await apiGet('dashboard');
@@ -558,6 +658,18 @@ function renderDashboard(data) {
   document.querySelectorAll('[data-mode="lite-only"]').forEach(el => {
     el.classList.toggle('hidden', !isLite);
   });
+
+  // Lite: скрыть 4-й KPI «Топливо» в тултипе + переключить grid-cols
+  const tipFuelEl = document.getElementById('tip-fuel');
+  if (tipFuelEl) {
+    const block = tipFuelEl.parentElement;
+    const grid  = block ? block.parentElement : null;
+    if (block) block.style.display = isLite ? 'none' : '';
+    if (grid) {
+      grid.classList.toggle('grid-cols-4', !isLite);
+      grid.classList.toggle('grid-cols-3',  isLite);
+    }
+  }
 
   if (data.empty) {
     document.getElementById('dash-last-empty').classList.remove('hidden');
@@ -587,33 +699,20 @@ function renderDashboard(data) {
   const totalN = data.totalReports || 0;
   document.getElementById('dash-total').textContent    = 'Всего: ' + totalN + ' ' + pluralWeeksShort(totalN);
 
-  // === SPARKLINE ===
+  // === STACKED BAR CHART ===
   const spark = data.sparkline || [];
-  const container = document.getElementById('dash-sparkline');
   const sparkTitle = document.getElementById('dash-sparkline-title');
 
   if (spark.length === 0) {
     if (sparkTitle) sparkTitle.textContent = 'Последние недели';
-    container.innerHTML = '<div class="w-full text-center text-on-surface-variant font-mono text-[10px] py-4">нет данных</div>';
   } else {
     const sparkN = spark.length;
     if (sparkTitle) {
       sparkTitle.textContent = 'Последние ' + sparkN + ' ' + pluralWeeksShort(sparkN);
     }
-
-    const max = Math.max(...spark.map(s => Number(s.netFull) || 0), 1);
-    container.innerHTML = spark.map(s => {
-      const netVal = Number(s.netFull) || 0;
-      const h = Math.max(4, Math.round(netVal / max * 70));
-      const ttl = esc((s.period || '') + ': ' + fmt(netVal));
-      const label = netVal > 0 ? Math.round(netVal) : '';
-      return `
-        <div class="flex-1 flex flex-col items-center justify-end gap-1 h-full">
-          <div class="font-mono text-[9px] text-primary font-bold leading-none">${label}</div>
-          <div class="w-full bg-primary/60 rounded-t" style="height:${h}px" title="${ttl}"></div>
-        </div>`;
-    }).join('');
   }
+
+  renderSparkline(spark, isLite);
 
   // === ИТОГО ЗА N НЕДЕЛЬ ===
   const summaryTitle = document.getElementById('sum4-title');
