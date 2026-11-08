@@ -359,6 +359,16 @@ function switchTab(name) {
   target.classList.add('flex');
   target.classList.add('fade-in');
 
+  // === ПОКАЗ/СКРЫТИЕ БРЕНДИНГА (только на «Обзор») ===
+  const brand = document.getElementById('brand-bar');
+  if (brand) {
+    if (name === 'dashboard') {
+      brand.classList.remove('hidden');
+    } else {
+      brand.classList.add('hidden');
+    }
+  }
+
   // === ОБНОВЛЕНИЕ TAB BAR ===
   document.querySelectorAll('.tab-btn').forEach(btn => {
     const isActive = btn.dataset.tab === name;
