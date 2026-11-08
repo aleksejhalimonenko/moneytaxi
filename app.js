@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v30.5 — stacked bar chart, swipe-карусель,
+   v30.6 — welcome-онбординг для новых юзеров,
+           stacked bar chart, swipe-карусель,
            унифицированная история,
            brand-bar удалён,
            обработка incomplete_uber_stats + taxesEstimated
@@ -13,7 +14,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v30.5';
+const APP_VERSION = 'v30.6';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -656,15 +657,33 @@ function renderDashboard(data) {
     }
   }
 
+  // ═════════ ПУСТОЙ ДАШБОРД → welcome-онбординг ═════════
   if (data.empty) {
-    document.getElementById('dash-last-empty').classList.remove('hidden');
-    document.getElementById('dash-last').classList.add('hidden');
-    document.getElementById('dash-last').classList.remove('flex');
-    document.getElementById('dash-total').textContent = 'Всего: 0 недель';
+    const emptyEl = document.getElementById('dash-last-empty');
+    if (emptyEl) {
+      emptyEl.classList.remove('hidden');
+      emptyEl.classList.add('flex');
+    }
+
+    const dashLast = document.getElementById('dash-last');
+    if (dashLast) {
+      dashLast.classList.add('hidden');
+      dashLast.classList.remove('flex');
+    }
+
+    const totalEl = document.getElementById('dash-total');
+    if (totalEl) totalEl.textContent = 'Всего: 0 недель';
+
     return;
   }
 
-  document.getElementById('dash-last-empty').classList.add('hidden');
+  // ═════════ НЕПУСТОЙ → обычный дашборд ═════════
+  const emptyEl = document.getElementById('dash-last-empty');
+  if (emptyEl) {
+    emptyEl.classList.add('hidden');
+    emptyEl.classList.remove('flex');
+  }
+
   document.getElementById('dash-last').classList.remove('hidden');
   document.getElementById('dash-last').classList.add('flex');
 
@@ -975,7 +994,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     state: 'queued',
     platform: '',
     error: '',
-    estimated: false     // ← taxesEstimated (налог восстановлен по формуле)
+    estimated: false
   }));
 
   function renderUploadStatus() {
@@ -1025,7 +1044,6 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
       </div>`;
     }).join('');
 
-    // Подсказка, если были estimated
     const estimateHint = estCount > 0
       ? `<div class="mt-2 pt-2 border-t border-white/5 text-[10px] text-tertiary leading-snug">
            ⚠️ ${estCount} ${estCount === 1 ? 'скрин обрезан' : 'скрина обрезаны'} — налоги восстановлены по формуле.
@@ -1079,7 +1097,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
   setTimeout(() => {
     status.classList.add('hidden');
     loadQueue();
-  }, 5000);  // чуть дольше (было 4000) — чтобы юзер увидел предупреждение
+  }, 5000);
 });
 
 function fileToBase64Compressed(file) {
@@ -1671,7 +1689,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     applyTelegramInsets();
 
     if (tg.onEvent) {
-      tg.onEvent('viewportChanged', applyTelegramInsets);
+      tg.onViewportChanged && tg.onEvent('viewportChanged', applyTelegramInsets);
       tg.onEvent('safeAreaChanged', applyTelegramInsets);
       tg.onEvent('fullscreenChanged', applyTelegramInsets);
     }
