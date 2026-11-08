@@ -1736,18 +1736,7 @@ function setActiveBase(base) {
   n.className = base === 'net'   ? on : off;
 }
 
-function setActiveBase(base) {
-  currentBase = base;
-  const g = document.getElementById('set-base-gross');
-  const n = document.getElementById('set-base-net');
-  if (!g || !n) return;
 
-  const on  = 'flex-1 py-2 rounded-full font-mono text-xs font-bold uppercase transition-all bg-primary text-on-primary';
-  const off = 'flex-1 py-2 rounded-full font-mono text-xs font-semibold uppercase transition-all text-on-surface-variant';
-
-  g.className = base === 'gross' ? on : off;
-  n.className = base === 'net'   ? on : off;
-}
 
 // === Слушатели кнопок Settings ===
 document.getElementById('set-lite').addEventListener('click', async () => {
