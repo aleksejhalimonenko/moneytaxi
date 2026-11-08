@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v29.3';
+const APP_VERSION = 'v29.4';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -1156,6 +1156,12 @@ function renderHistory(list) {
     const period = r.dateRange || '—';
     const isPro = modeLabel === 'pro';
 
+    // Расчёт стоимости топлива на 100 км (в злотых)
+    let fuelCostPer100 = '—';
+    if (r.km > 0 && r.fuel > 0) {
+      fuelCostPer100 = ((r.fuel / r.km) * 100).toFixed(2).replace('.', ',') + ' zł/100км';
+    }
+
     // Блок "Автомобиль" только для PRO
     let carBlock = '';
     if (isPro) {
@@ -1163,7 +1169,8 @@ function renderHistory(list) {
         <div class="mt-2 pt-2 border-t border-white/5 grid grid-cols-2 gap-2 font-mono text-xs">
           <div><span class="text-on-surface-variant">Пробег:</span> <span class="font-semibold">${r.km || 0} км</span></div>
           <div><span class="text-on-surface-variant">Топливо:</span> <span class="text-error">-${fmt(r.fuel)}</span></div>
-          <div class="col-span-2"><span class="text-on-surface-variant">Амортизация:</span> <span class="text-error">-${fmt(r.depreciation)}</span></div>
+          <div><span class="text-on-surface-variant">Амортизация:</span> <span class="text-error">-${fmt(r.depreciation)}</span></div>
+          <div><span class="text-on-surface-variant">Топливо на 100км:</span> <span class="font-semibold text-secondary">${fuelCostPer100}</span></div>
         </div>`;
     }
 
