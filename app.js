@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v30.4 — stacked bar chart, swipe-карусель,
+   v30.5 — stacked bar chart, swipe-карусель,
            унифицированная история,
-           brand-bar удалён (переключение режима только в настройках)
+           brand-bar удалён,
+           обработка incomplete_uber_stats + taxesEstimated
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -12,7 +13,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v30.4';
+const APP_VERSION = 'v30.5';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -188,7 +189,7 @@ const PROGRESS = {
   }
 };
 
-// === SKELETON (не трогает hidden у <section>, только у скелетонов и контент-обёрток) ===
+// === SKELETON ===
 function showSkeleton(name) {
   const sk = document.getElementById('skeleton-' + name);
   if (sk) { sk.classList.remove('hidden'); sk.classList.add('flex'); }
@@ -242,7 +243,7 @@ const CACHE = {
   }
 };
 
-// === LOCALSTORAGE CACHE (persistent) ===
+// === LOCALSTORAGE CACHE ===
 const LS = {
   TTL: 10 * 60 * 1000,
   available: (() => {
@@ -351,7 +352,7 @@ let currentIndex = 0;
 const viewportEl = document.getElementById('swipe-viewport');
 const trackEl    = document.getElementById('swipe-track');
 const tabBtns    = Array.from(document.querySelectorAll('.tab-btn'));
-const brandBar   = document.getElementById('brand-bar'); // null после удаления из HTML — это ок
+const brandBar   = document.getElementById('brand-bar');
 
 let isDragging        = false;
 let startX            = 0;
@@ -365,7 +366,6 @@ function measureViewport() {
   viewportWidth = viewportEl.getBoundingClientRect().width || window.innerWidth || 390;
 }
 
-/** Позиционирует пилюлю под активной кнопкой */
 function movePill(activeBtn, animated) {
   const pill   = document.getElementById('tab-pill');
   const tabbar = document.getElementById('tabbar-container');
@@ -383,7 +383,6 @@ function movePill(activeBtn, animated) {
   pill.style.opacity = '1';
 }
 
-/** Подсветка кнопок таб-бара под индекс */
 function setActiveTabVisuals(index) {
   tabBtns.forEach((btn, i) => {
     const active = i === index;
@@ -405,7 +404,6 @@ function setActiveTabVisuals(index) {
   });
 }
 
-/** Ленивая подгрузка данных при активации вкладки */
 function loadTabData(name) {
   if (name === 'dashboard')   loadDashboard();
   if (name === 'screenshots') loadQueue();
@@ -414,7 +412,6 @@ function loadTabData(name) {
   if (name === 'settings')    loadSettings();
 }
 
-/** ЕДИНАЯ ТОЧКА ПРАВДЫ — и свайп, и клик по табу идут сюда */
 function goToTab(index, animated = true) {
   if (!trackEl) return;
 
@@ -430,7 +427,6 @@ function goToTab(index, animated = true) {
   setActiveTabVisuals(index);
   movePill(tabBtns[index], animated);
 
-  // brand-bar удалён из HTML — if (brandBar) защищает от ошибки
   if (brandBar) brandBar.classList.toggle('hidden', TAB_ORDER[index] !== 'dashboard');
 
   if (prevIndex !== index) {
@@ -966,7 +962,7 @@ function goToCalculation() {
 }
 window.goToCalculation = goToCalculation;
 
-// === Upload ===
+// === Upload (обработка incomplete_uber_stats + taxesEstimated) ===
 document.getElementById('file-input').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
@@ -978,7 +974,8 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     file: f,
     state: 'queued',
     platform: '',
-    error: ''
+    error: '',
+    estimated: false     // ← taxesEstimated (налог восстановлен по формуле)
   }));
 
   function renderUploadStatus() {
@@ -987,6 +984,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     const allDone = done === total;
     const okCount = items.filter(i => i.state === 'ok').length;
     const errCount = items.filter(i => i.state === 'error').length;
+    const estCount = items.filter(i => i.estimated).length;
 
     let headerText, headerColor;
     if (!allDone) {
@@ -1013,8 +1011,8 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
         label = 'распознаю...'; cls = 'text-primary';
       } else if (it.state === 'ok') {
         icon = '✅';
-        label = it.platform || 'распознан';
-        cls = 'text-primary';
+        label = (it.platform || 'распознан') + (it.estimated ? ' ⚠️' : '');
+        cls = it.estimated ? 'text-tertiary' : 'text-primary';
       } else {
         icon = '❌';
         label = it.error || 'ошибка';
@@ -1027,10 +1025,19 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
       </div>`;
     }).join('');
 
+    // Подсказка, если были estimated
+    const estimateHint = estCount > 0
+      ? `<div class="mt-2 pt-2 border-t border-white/5 text-[10px] text-tertiary leading-snug">
+           ⚠️ ${estCount} ${estCount === 1 ? 'скрин обрезан' : 'скрина обрезаны'} — налоги восстановлены по формуле.
+           Если были чаевые, цифры могут отличаться на несколько zł.
+         </div>`
+      : '';
+
     status.innerHTML = `
       <div class="flex flex-col gap-2">
         <div class="font-mono text-[11px] font-bold uppercase ${headerColor}">${headerText}</div>
         <div class="flex flex-col gap-1 font-mono text-[11px]">${rows}</div>
+        ${estimateHint}
       </div>`;
   }
 
@@ -1045,14 +1052,20 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
     try {
       const base64 = await fileToBase64Compressed(it.file);
       const data = await apiPost('uploadScreenshot', { base64, filename: it.file.name });
+
       if (!data.ok) {
         it.state = 'error';
-        it.error = data.error === 'pending_cash'
-          ? 'сначала укажите нал Uber'
-          : (data.error || 'ошибка');
+        if (data.error === 'pending_cash') {
+          it.error = 'сначала укажите нал Uber';
+        } else if (data.error === 'incomplete_uber_stats') {
+          it.error = 'скрин обрезан — нужен полный';
+        } else {
+          it.error = data.error || 'ошибка';
+        }
       } else {
         it.state = 'ok';
         it.platform = data.parsed.platform || 'распознан';
+        it.estimated = !!(data.parsed.taxesEstimated || data.taxesEstimated);
       }
     } catch (err) {
       it.state = 'error';
@@ -1066,7 +1079,7 @@ document.getElementById('file-input').addEventListener('change', async (e) => {
   setTimeout(() => {
     status.classList.add('hidden');
     loadQueue();
-  }, 4000);
+  }, 5000);  // чуть дольше (было 4000) — чтобы юзер увидел предупреждение
 });
 
 function fileToBase64Compressed(file) {
@@ -1571,14 +1584,11 @@ function setActiveMode(mode) {
 
   const lite  = document.getElementById('set-lite');
   const pro   = document.getElementById('set-pro');
-  const hLite = document.getElementById('hdr-lite'); // null после удаления из HTML
-  const hPro  = document.getElementById('hdr-pro');  // null после удаления из HTML
+  const hLite = document.getElementById('hdr-lite');
+  const hPro  = document.getElementById('hdr-pro');
 
-  // Кнопки в панели настроек — компактные
   const onSet  = 'flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]';
   const offSet = 'flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white';
-
-  // Кнопки в шапке — как были (не используются, но на всякий случай)
   const onHdr  = 'px-2 py-1 rounded-full bg-primary text-on-primary font-mono text-[10px] font-bold uppercase transition-all';
   const offHdr = 'px-2 py-1 rounded-full text-on-surface-variant font-mono text-[10px] font-semibold uppercase hover:text-on-surface transition-all';
 
@@ -1629,7 +1639,7 @@ document.getElementById('set-base-net').addEventListener('click', async () => {
   if (r.ok) calcDefaults = r.settings;
 });
 
-// === Слушатели hdr-lite / hdr-pro (null-guard, т.к. кнопки удалены из HTML) ===
+// === Слушатели hdr-lite / hdr-pro (null-guard) ===
 const hdrLiteBtn = document.getElementById('hdr-lite');
 const hdrProBtn  = document.getElementById('hdr-pro');
 
