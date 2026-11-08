@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v29.1';
+const APP_VERSION = 'v29.2';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -1151,10 +1151,21 @@ function renderHistory(list) {
 
   // === Список карточек ===
   container.innerHTML = list.map((r, i) => {
-    const isOpen = false; // по умолчанию свёрнуто
     const modeLabel = (r.mode || 'lite') === 'lite' ? 'lite' : 'pro';
     const plat = r.platform || '—';
     const period = r.dateRange || '—';
+    const isPro = modeLabel === 'pro';
+
+    // Блок "Автомобиль" только для PRO
+    let carBlock = '';
+    if (isPro) {
+      carBlock = `
+        <div class="mt-2 pt-2 border-t border-white/5 grid grid-cols-2 gap-2 font-mono text-xs">
+          <div><span class="text-on-surface-variant">Пробег:</span> <span class="font-semibold">${r.km || 0} км</span></div>
+          <div><span class="text-on-surface-variant">Топливо:</span> <span class="text-error">-${fmt(r.fuel)}</span></div>
+          <div class="col-span-2"><span class="text-on-surface-variant">Амортизация:</span> <span class="text-error">-${fmt(r.depreciation)}</span></div>
+        </div>`;
+    }
 
     return `
       <div class="history-card bg-surface-container rounded-xl p-4 cursor-pointer" data-index="${i}">
@@ -1179,6 +1190,9 @@ function renderHistory(list) {
             <div><span class="text-on-surface-variant">Нал:</span> <span class="text-tertiary">${fmt(r.cash)}</span></div>
             <div><span class="text-on-surface-variant">Бонусы:</span> <span>${fmt(r.bonuses)}</span></div>
           </div>
+
+          ${carBlock}
+
           <div class="mt-2 pt-2 border-t border-white/5 flex flex-col gap-1 font-mono text-xs">
             <div class="flex justify-between"><span class="text-on-surface-variant">Партнёрка (${(r.partnerPct*100).toFixed(2)}%):</span><span class="text-error">-${fmt(r.partnerVat)}</span></div>
             <div class="flex justify-between"><span class="text-on-surface-variant">Налог на бонусы:</span><span class="text-error">-${fmt(r.bonusTax)}</span></div>
@@ -1221,7 +1235,7 @@ function renderHistory(list) {
   });
 
   // === Итоговая сводка ===
-  const recent = list.slice(0, 4);  // последние 4
+  const recent = list.slice(0, 4);
   const s = { card: 0, cash: 0, net: 0, netFuel: 0, netFull: 0 };
   recent.forEach(r => {
     s.card    += Number(r.cardPayout) || 0;
@@ -1237,7 +1251,6 @@ function renderHistory(list) {
   document.getElementById('hist-sum-fuel').textContent = fmt(s.netFuel);
   document.getElementById('hist-sum-full').textContent = fmt(s.netFull);
 
-  // Заголовок итогов
   const summaryN = Math.min(4, list.length);
   document.getElementById('history-summary-title').textContent =
     'Итого за ' + summaryN + ' ' + pluralWeeksShort(summaryN);
