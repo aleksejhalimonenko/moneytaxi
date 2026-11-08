@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v29.5';
+const APP_VERSION = 'v29.6';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -1154,6 +1154,7 @@ function renderHistory(list) {
     const plat = r.platform || '—';
     const period = r.dateRange || '—';
     const isPro = modeLabel === 'pro';
+    const isFirst = i === 0; // первая карточка — большая (текущая)
 
     // Расчёт стоимости топлива на 100 км
     let fuelCostPer100 = '—';
@@ -1161,7 +1162,6 @@ function renderHistory(list) {
       fuelCostPer100 = ((r.fuel / r.km) * 100).toFixed(2).replace('.', ',') + ' zł / 100 км';
     }
 
-    // Общая сумма налогов и комиссий для заголовка
     const totalTaxes = (r.partnerVat || 0) + (r.bonusTax || 0) + (r.partnerFee || 0) + (r.zus || 0);
 
     // Блок расходов на авто (только для PRO)
@@ -1179,52 +1179,165 @@ function renderHistory(list) {
                 <span class="text-slate-300">Топливо</span>
                 <span class="text-[11px] text-sky-400/90 block">${fuelCostPer100}</span>
               </div>
-              <span class="font-semibold text-rose-400 tabular-nums">-${fmt(r.fuel)}</span>
+              <span class="font-semibold text-app-danger tabular-nums">-${fmt(r.fuel)}</span>
             </div>
             <div class="flex justify-between items-center pt-0.5">
               <span class="text-slate-300">Амортизация</span>
-              <span class="font-semibold text-rose-400 tabular-nums">-${fmt(r.depreciation)}</span>
+              <span class="font-semibold text-app-danger tabular-nums">-${fmt(r.depreciation)}</span>
             </div>
           </div>
         </div>`;
     }
 
-    return `
-      <article class="history-card bg-[#131B26] rounded-2xl border border-emerald-500/25 shadow-lg shadow-black/40 overflow-hidden mb-3 cursor-pointer" data-index="${i}">
-        
-        <!-- Шапка карточки -->
-        <div class="p-4 bg-gradient-to-b from-[#1A2332]/90 to-[#131B26] border-b border-[#243044]/60 flex items-center justify-between">
-          <div class="flex flex-wrap items-center gap-2">
-            <div class="flex items-center gap-1.5 bg-[#0A0E17]/80 px-2.5 py-1 rounded-md border border-slate-700/60 text-xs font-semibold text-slate-200">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-              ${esc(plat)}
+    // ============ БОЛЬШАЯ КАРТОЧКА (первая, "текущая неделя") ============
+    if (isFirst) {
+      return `
+        <article class="history-card bg-app-card rounded-2xl border border-emerald-500/25 shadow-lg shadow-black/40 overflow-hidden mb-3 cursor-pointer" data-index="${i}">
+          
+          <!-- Шапка -->
+          <div class="p-4 bg-gradient-to-b from-app-surface/90 to-app-card border-b border-app-border/60 flex items-center justify-between">
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-md border border-slate-700/60 text-xs font-semibold text-slate-200">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                ${esc(plat)}
+              </div>
+              <span class="text-xs text-app-subtext font-medium">${esc(period)}</span>
+              <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">${esc(modeLabel)}</span>
             </div>
-            <span class="text-xs text-slate-400 font-medium">${esc(period)}</span>
-            <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">${esc(modeLabel)}</span>
+            <span class="material-symbols-outlined text-slate-400 history-chevron text-xl">expand_less</span>
+          </div>
+
+          <!-- KPI-блоки -->
+          <div class="p-4 bg-app-card/60 grid grid-cols-2 gap-3 border-b border-app-border/40">
+            <div class="bg-app-surface/60 rounded-xl p-3 border border-emerald-500/20 relative overflow-hidden">
+              <div class="text-[11px] uppercase tracking-wider font-semibold text-emerald-400/90 mb-1 flex items-center gap-1">
+                <span>Профит (чистыми)</span>
+              </div>
+              <div class="text-xl font-bold tracking-tight text-emerald-400 tabular-nums">
+                ${fmt(r.netFull)}
+              </div>
+              <span class="text-[10px] text-slate-400 block mt-0.5">после всех расходов</span>
+            </div>
+            <div class="bg-app-surface/60 rounded-xl p-3 border border-app-border/70 relative">
+              <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-300 mb-1">
+                К выплате
+              </div>
+              <div class="text-xl font-bold tracking-tight text-white tabular-nums">
+                ${fmt(r.netCash)}
+              </div>
+              <span class="text-[10px] text-app-subtext block mt-0.5">с учётом налички</span>
+            </div>
+          </div>
+
+          <!-- Развёрнутая часть -->
+          <div class="history-details">
+            
+            <!-- Блок 1: Доход -->
+            <div class="px-4 py-3 border-b border-app-border/40 space-y-2.5">
+              <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                <span>Доход от заказов</span>
+                <span class="text-[11px] text-emerald-400 lowercase font-normal">за неделю</span>
+              </div>
+              <div class="space-y-1.5 text-xs">
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Брутто</span>
+                  <span class="font-medium text-slate-200 tabular-nums">${fmt(r.gross)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Нетто</span>
+                  <span class="font-semibold text-white tabular-nums">${fmt(r.net)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Бонусы парка / сервисов</span>
+                  <span class="font-medium text-emerald-400 tabular-nums">+${fmt(r.bonuses)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Наличные от пассажиров</span>
+                  <span class="font-medium text-amber-300/90 tabular-nums">${fmt(r.cash)}</span>
+                </div>
+              </div>
+            </div>
+
+            ${carBlock}
+
+            <!-- Блок 3: Налоги -->
+            <div class="px-4 py-3 border-b border-app-border/40 space-y-2.5">
+              <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                <span>Налоги и комиссии</span>
+                <span class="text-[11px] text-rose-400/80 font-normal">-${fmt(totalTaxes)}</span>
+              </div>
+              <div class="space-y-1.5 text-xs">
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Партнёрка (${(r.partnerPct * 100).toFixed(2)}%)</span>
+                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.partnerVat)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Налог на бонусы</span>
+                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.bonusTax)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">Комиссия</span>
+                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.partnerFee)}</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-slate-400">ZUS</span>
+                  <span class="font-medium text-app-danger tabular-nums">-${fmt(r.zus)}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Блок 4: Распределение -->
+            <div class="p-3 bg-app-surface/80 m-3 rounded-xl border border-app-border space-y-2">
+              <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sm text-emerald-400">credit_card</span>
+                Распределение выплаты
+              </div>
+              <div class="flex items-center justify-between text-xs bg-slate-900/60 p-2.5 rounded-lg border border-slate-800">
+                <div class="flex items-center gap-2">
+                  <div class="w-5 h-4 bg-amber-400/20 border border-amber-400/40 rounded flex items-center justify-center text-[9px] text-amber-300 font-bold">💳</div>
+                  <span class="text-slate-200 font-medium">Перевод на карту</span>
+                </div>
+                <span class="font-bold text-white tabular-nums">${fmt(r.cardPayout)}</span>
+              </div>
+              <div class="flex items-center justify-between text-xs pt-1 px-1">
+                <span class="text-slate-400">Наличные на руках:</span>
+                <span class="font-medium text-slate-200 tabular-nums">${fmt(r.cash)}</span>
+              </div>
+              <div class="flex items-center justify-between text-xs pt-0.5 px-1 border-t border-slate-800/80">
+                <span class="text-emerald-400 font-semibold">Итого на руки:</span>
+                <span class="font-bold text-emerald-400 tabular-nums text-sm">${fmt(r.netCash)}</span>
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+    // ============ КОМПАКТНАЯ КАРТОЧКА (все остальные) ============
+    return `
+      <article class="history-card bg-app-card rounded-xl p-3.5 border border-app-border/80 hover:border-slate-700 transition mb-2.5 cursor-pointer" data-index="${i}">
+        <div class="flex items-center justify-between">
+          <div class="space-y-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-slate-800 text-[11px] font-semibold text-slate-300 border border-slate-700">${esc(plat)}</span>
+              <span class="text-xs text-app-subtext">${esc(period)}</span>
+            </div>
+            <div class="flex items-center gap-3 text-xs pt-0.5">
+              <span class="text-slate-400">На руки: <strong class="text-emerald-400 tabular-nums font-semibold">${fmt(r.netCash)}</strong></span>
+              <span class="text-slate-600">•</span>
+              <span class="text-slate-400">Профит: <strong class="text-slate-200 tabular-nums font-medium">${fmt(r.netFull)}</strong></span>
+            </div>
           </div>
           <span class="material-symbols-outlined text-slate-400 history-chevron text-xl">expand_more</span>
         </div>
 
-        <!-- Свёрнутая часть (видна всегда) -->
-        <div class="px-4 py-3 grid grid-cols-2 gap-3">
-          <div class="bg-[#1A2332]/60 rounded-xl p-3 border border-[#243044]/70">
-            <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-300 mb-1">На руки</div>
-            <div class="text-lg font-bold tracking-tight text-white tabular-nums">${fmt(r.netCash)}</div>
-          </div>
-          <div class="bg-[#1A2332]/60 rounded-xl p-3 border border-emerald-500/20">
-            <div class="text-[11px] uppercase tracking-wider font-semibold text-emerald-400/90 mb-1">Профит</div>
-            <div class="text-lg font-bold tracking-tight text-emerald-400 tabular-nums">${fmt(r.netFull)}</div>
-          </div>
-        </div>
-
-        <!-- Развёрнутая часть -->
-        <div class="history-details hidden border-t border-[#243044]/60">
+        <!-- Развёрнутая часть (скрыта по умолчанию, раскрывается по клику) -->
+        <div class="history-details hidden mt-3 pt-3 border-t border-app-border/40">
           
           <!-- Блок 1: Доход -->
-          <div class="px-4 py-3 border-b border-[#243044]/40 space-y-2.5">
+          <div class="space-y-2.5 mb-3">
             <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
               <span>Доход от заказов</span>
-              <span class="text-[11px] text-emerald-400 lowercase font-normal">за неделю</span>
             </div>
             <div class="space-y-1.5 text-xs">
               <div class="flex justify-between items-center">
@@ -1236,64 +1349,57 @@ function renderHistory(list) {
                 <span class="font-semibold text-white tabular-nums">${fmt(r.net)}</span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-slate-400">Бонусы парка / сервисов</span>
+                <span class="text-slate-400">Бонусы</span>
                 <span class="font-medium text-emerald-400 tabular-nums">+${fmt(r.bonuses)}</span>
               </div>
               <div class="flex justify-between items-center">
-                <span class="text-slate-400">Наличные от пассажиров</span>
+                <span class="text-slate-400">Наличные</span>
                 <span class="font-medium text-amber-300/90 tabular-nums">${fmt(r.cash)}</span>
               </div>
             </div>
           </div>
 
-          ${carBlock}
+          ${isPro ? carBlock : ''}
 
           <!-- Блок 3: Налоги -->
-          <div class="px-4 py-3 border-b border-[#243044]/40 space-y-2.5">
+          <div class="space-y-2.5 mt-3">
             <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
               <span>Налоги и комиссии</span>
               <span class="text-[11px] text-rose-400/80 font-normal">-${fmt(totalTaxes)}</span>
             </div>
             <div class="space-y-1.5 text-xs">
               <div class="flex justify-between items-center">
-                <span class="text-slate-400">Партнёрка (${(r.partnerPct * 100).toFixed(2)}%)</span>
-                <span class="font-medium text-rose-400 tabular-nums">-${fmt(r.partnerVat)}</span>
+                <span class="text-slate-400">Партнёрка</span>
+                <span class="font-medium text-app-danger tabular-nums">-${fmt(r.partnerVat)}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-slate-400">Налог на бонусы</span>
-                <span class="font-medium text-rose-400 tabular-nums">-${fmt(r.bonusTax)}</span>
+                <span class="font-medium text-app-danger tabular-nums">-${fmt(r.bonusTax)}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-slate-400">Комиссия</span>
-                <span class="font-medium text-rose-400 tabular-nums">-${fmt(r.partnerFee)}</span>
+                <span class="font-medium text-app-danger tabular-nums">-${fmt(r.partnerFee)}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-slate-400">ZUS</span>
-                <span class="font-medium text-rose-400 tabular-nums">-${fmt(r.zus)}</span>
+                <span class="font-medium text-app-danger tabular-nums">-${fmt(r.zus)}</span>
               </div>
             </div>
           </div>
 
           <!-- Блок 4: Распределение -->
-          <div class="p-3 bg-[#1A2332]/80 m-3 rounded-xl border border-[#243044] space-y-2">
-            <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 flex items-center gap-1.5">
-              <span class="material-symbols-outlined text-sm text-emerald-400">credit_card</span>
-              Распределение выплаты
+          <div class="mt-3 p-2.5 bg-app-surface/80 rounded-lg border border-app-border space-y-1.5">
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">На карту:</span>
+              <span class="font-semibold text-white tabular-nums">${fmt(r.cardPayout)}</span>
             </div>
-            <div class="flex items-center justify-between text-xs bg-[#0A0E17]/60 p-2.5 rounded-lg border border-[#243044]">
-              <div class="flex items-center gap-2">
-                <div class="w-5 h-4 bg-amber-400/20 border border-amber-400/40 rounded flex items-center justify-center text-[9px] text-amber-300 font-bold">💳</div>
-                <span class="text-slate-200 font-medium">Перевод на карту</span>
-              </div>
-              <span class="font-bold text-white tabular-nums">${fmt(r.cardPayout)}</span>
-            </div>
-            <div class="flex items-center justify-between text-xs pt-1 px-1">
-              <span class="text-slate-400">Наличные на руках:</span>
+            <div class="flex justify-between items-center text-xs">
+              <span class="text-slate-400">Наличные:</span>
               <span class="font-medium text-slate-200 tabular-nums">${fmt(r.cash)}</span>
             </div>
-            <div class="flex items-center justify-between text-xs pt-0.5 px-1 border-t border-[#243044]/80">
+            <div class="flex justify-between items-center text-xs pt-1 border-t border-app-border/60">
               <span class="text-emerald-400 font-semibold">Итого на руки:</span>
-              <span class="font-bold text-emerald-400 tabular-nums text-sm">${fmt(r.netCash)}</span>
+              <span class="font-bold text-emerald-400 tabular-nums">${fmt(r.netCash)}</span>
             </div>
           </div>
         </div>
@@ -1308,21 +1414,21 @@ function renderHistory(list) {
 
       const details = card.querySelector('.history-details');
       const chevron = card.querySelector('.history-chevron');
+      if (!details || !chevron) return;
+
       const isOpen = !details.classList.contains('hidden');
 
       if (isOpen) {
         details.classList.add('hidden');
-        // Меняем иконку на "вниз" и убираем подсветку
         chevron.textContent = 'expand_more';
       } else {
         details.classList.remove('hidden');
-        // Меняем иконку на "вверх" и добавляем легкую подсветку
         chevron.textContent = 'expand_less';
       }
     });
   });
 
-  // === Итоговая сводка (оставляем как было, это отдельный блок под списком) ===
+  // === Итоговая сводка ===
   const recent = list.slice(0, 4);
   const s = { card: 0, cash: 0, net: 0, netFuel: 0, netFull: 0 };
   recent.forEach(r => {
