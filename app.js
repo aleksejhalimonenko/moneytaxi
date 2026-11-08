@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v30.6 — welcome-онбординг для новых юзеров,
+   v30.7 — welcome-онбординг, фикс первого рендера dashboard,
            stacked bar chart, swipe-карусель,
-           унифицированная история,
-           brand-bar удалён,
+           унифицированная история, brand-bar удалён,
            обработка incomplete_uber_stats + taxesEstimated
    ═══════════════════════════════════════════════════ */
 
@@ -14,7 +13,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v30.6';
+const APP_VERSION = 'v30.7';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -1689,7 +1688,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     applyTelegramInsets();
 
     if (tg.onEvent) {
-      tg.onViewportChanged && tg.onEvent('viewportChanged', applyTelegramInsets);
+      tg.onEvent('viewportChanged', applyTelegramInsets);
       tg.onEvent('safeAreaChanged', applyTelegramInsets);
       tg.onEvent('fullscreenChanged', applyTelegramInsets);
     }
@@ -1728,6 +1727,14 @@ window.addEventListener('DOMContentLoaded', async () => {
       showError('Авторизация не прошла: ' + (auth.reason || auth.error));
       PROGRESS.done();
       return;
+    }
+
+    // ✅ Явно рендерим дашборд после загрузки (для fresh-кейса)
+    // Это исправляет баг: при первом запуске без кэша "Обзор" не рендерился,
+    // пока юзер не переключится на другую вкладку и обратно.
+    if (dash && dash.ok) {
+      renderDashboard(dash);
+      hideSkeleton('dashboard');
     }
 
     if (!cachedDash) {
