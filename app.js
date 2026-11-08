@@ -373,7 +373,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     const isActive = btn.dataset.tab === name;
     const icon = btn.querySelector('.material-symbols-outlined');
-    const label = btn.querySelector('span.text-\\[11px\\]') || btn.querySelector('span:last-child');
+    const label = btn.querySelector('span:last-child');
 
     if (isActive) {
       btn.classList.remove('text-slate-400');
