@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v29.6';
+const APP_VERSION = 'v29.7';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -359,16 +359,40 @@ function switchTab(name) {
   target.classList.add('flex');
   target.classList.add('fade-in');
 
+  // === ОБНОВЛЕНИЕ TAB BAR ===
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    if (btn.dataset.tab === name) {
-      btn.classList.add('text-primary');
-      btn.classList.remove('text-on-surface-variant');
+    const isActive = btn.dataset.tab === name;
+    const icon = btn.querySelector('.material-symbols-outlined');
+    const label = btn.querySelector('span.text-\\[11px\\]') || btn.querySelector('span:last-child');
+
+    if (isActive) {
+      btn.classList.remove('text-slate-400');
+      btn.classList.add('text-emerald-400', 'font-semibold');
+      if (icon) { icon.classList.add('scale-105'); icon.classList.remove('scale-100'); }
+      if (label) { label.classList.add('font-semibold'); label.classList.remove('font-medium'); }
     } else {
-      btn.classList.remove('text-primary');
-      btn.classList.add('text-on-surface-variant');
+      btn.classList.add('text-slate-400');
+      btn.classList.remove('text-emerald-400', 'font-semibold');
+      if (icon) { icon.classList.remove('scale-105'); icon.classList.add('scale-100'); }
+      if (label) { label.classList.remove('font-semibold'); label.classList.add('font-medium'); }
     }
   });
 
+  // === ДВИГАЕМ ПИЛЮЛЮ ===
+  const activeBtn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
+  const pill = document.getElementById('tab-pill');
+  const tabbar = document.getElementById('tabbar-container');
+  if (activeBtn && pill && tabbar) {
+    const tabRect = activeBtn.getBoundingClientRect();
+    const parentRect = tabbar.getBoundingClientRect();
+    const offsetLeft = tabRect.left - parentRect.left;
+    const width = tabRect.width;
+    pill.style.left = `${offsetLeft}px`;
+    pill.style.width = `${width}px`;
+    pill.style.opacity = '1';
+  }
+
+  // === ЗАГРУЗКА ДАННЫХ ===
   if (name === 'dashboard')   loadDashboard();
   if (name === 'screenshots') loadQueue();
   if (name === 'calculator')  loadCalcDefaults();
@@ -1588,5 +1612,21 @@ window.addEventListener('DOMContentLoaded', async () => {
     showError('Не удалось подключиться к API: ' + err.message);
   } finally {
     PROGRESS.done();
+     
+// ═══ НОВОЕ: принудительный пересчёт позиции пилюли после полной загрузки ═══
+    setTimeout(() => {
+      const initialTab = document.querySelector('.tab-btn[data-tab="dashboard"]');
+      const pill = document.getElementById('tab-pill');
+      const tabbar = document.getElementById('tabbar-container');
+      if (initialTab && pill && tabbar) {
+        const tabRect = initialTab.getBoundingClientRect();
+        const parentRect = tabbar.getBoundingClientRect();
+        pill.style.transition = 'none';
+        pill.style.left = `${tabRect.left - parentRect.left}px`;
+        pill.style.width = `${tabRect.width}px`;
+        pill.style.opacity = '1';
+        setTimeout(() => { pill.style.transition = ''; }, 100);
+      }
+    }, 100);
   }
 });
