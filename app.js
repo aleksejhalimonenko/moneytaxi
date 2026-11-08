@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v29.1 — исправлен "реальный профит": вычитаем топливо и амортизацию
+   v30.0 — swipe-карусель между вкладками,
+           двусторонняя синхронизация с таб-баром
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -10,7 +11,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v29.9';
+const APP_VERSION = 'v30.0';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -42,11 +43,6 @@ function pluralWeeksShort(n) {
   return 'недель';
 }
 
-/**
- * Универсальный toast
- * @param {string} msg — текст
- * @param {string} type — 'success' (по умолчанию) | 'error' | 'info'
- */
 function toast(msg, type) {
   const el = document.getElementById('save-toast');
   if (!el) return;
@@ -73,10 +69,6 @@ function toast(msg, type) {
   el._t = setTimeout(() => el.classList.add('hidden'), 2500);
 }
 
-/**
- * Блокирует кнопку на время выполнения fn().
- * Восстанавливает исходное состояние по завершении (успех или ошибка).
- */
 async function withButtonLoading(btn, fn, loadingText) {
   if (!btn) return await fn();
   const original = btn.innerHTML;
@@ -125,9 +117,7 @@ function applyTelegramInsets() {
   const left   = Math.max(0, Math.round(inset.left   || 0));
   const right  = Math.max(0, Math.round(inset.right  || 0));
 
-  if (tg.isFullscreen && top < 56) {
-    top = 56;
-  }
+  if (tg.isFullscreen && top < 56) top = 56;
 
   root.style.setProperty('--tg-inset-top',    top    + 'px');
   root.style.setProperty('--tg-inset-bottom', bottom + 'px');
@@ -197,7 +187,7 @@ const PROGRESS = {
   }
 };
 
-// === SKELETON ===
+// === SKELETON (не трогает hidden у <section>, только у скелетонов и контент-обёрток) ===
 function showSkeleton(name) {
   const sk = document.getElementById('skeleton-' + name);
   if (sk) { sk.classList.remove('hidden'); sk.classList.add('flex'); }
@@ -348,66 +338,208 @@ function _invalidateAfterPost(action) {
   }
 }
 
-// === Tab Switching ===
-function switchTab(name) {
-  document.querySelectorAll('#tab-dashboard, #tab-screenshots, #tab-calculator, #tab-history, #tab-settings')
-    .forEach(el => { el.classList.add('hidden'); el.classList.remove('flex'); });
+// ═══════════════════════════════════════════════════
+//   SWIPE CAROUSEL + TAB SYNC
+// ═══════════════════════════════════════════════════
 
-  const target = document.getElementById('tab-' + name);
-  if (!target) return;
-  target.classList.remove('hidden');
-  target.classList.add('flex');
-  target.classList.add('fade-in');
+const TAB_ORDER = ['dashboard', 'screenshots', 'calculator', 'history', 'settings'];
+const TAB_COUNT = TAB_ORDER.length;
 
-  // === ПОКАЗ/СКРЫТИЕ БРЕНДИНГА (только на «Обзор») ===
-  const brand = document.getElementById('brand-bar');
-  if (brand) {
-    if (name === 'dashboard') {
-      brand.classList.remove('hidden');
-    } else {
-      brand.classList.add('hidden');
-    }
-  }
+let currentIndex = 0;
 
-  // === ОБНОВЛЕНИЕ TAB BAR ===
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    const isActive = btn.dataset.tab === name;
-    const icon = btn.querySelector('.material-symbols-outlined');
+const viewportEl = document.getElementById('swipe-viewport');
+const trackEl    = document.getElementById('swipe-track');
+const tabBtns    = Array.from(document.querySelectorAll('.tab-btn'));
+const brandBar   = document.getElementById('brand-bar');
+
+let isDragging        = false;
+let startX            = 0;
+let startY            = 0;
+let currentDeltaX     = 0;
+let isHorizontalGesture = null;
+let viewportWidth     = 0;
+
+function measureViewport() {
+  if (!viewportEl) return;
+  viewportWidth = viewportEl.getBoundingClientRect().width || window.innerWidth || 390;
+}
+
+/** Позиционирует пилюлю под активной кнопкой */
+function movePill(activeBtn, animated) {
+  const pill   = document.getElementById('tab-pill');
+  const tabbar = document.getElementById('tabbar-container');
+  if (!activeBtn || !pill || !tabbar) return;
+
+  const tRect = activeBtn.getBoundingClientRect();
+  const pRect = tabbar.getBoundingClientRect();
+
+  pill.style.transition = animated
+    ? 'all 0.38s cubic-bezier(0.34, 1.56, 0.64, 1)'
+    : 'none';
+
+  pill.style.left    = `${tRect.left - pRect.left}px`;
+  pill.style.width   = `${tRect.width}px`;
+  pill.style.opacity = '1';
+}
+
+/** Подсветка кнопок таб-бара под индекс */
+function setActiveTabVisuals(index) {
+  tabBtns.forEach((btn, i) => {
+    const active = i === index;
+    btn.classList.toggle('text-emerald-400', active);
+    btn.classList.toggle('text-slate-400',  !active);
+    btn.classList.toggle('font-semibold',    active);
+
+    const icon  = btn.querySelector('.material-symbols-outlined');
     const label = btn.querySelector('span:last-child');
 
-    if (isActive) {
-      btn.classList.remove('text-slate-400');
-      btn.classList.add('text-emerald-400', 'font-semibold');
-      if (icon) { icon.classList.add('scale-105'); icon.classList.remove('scale-100'); }
-      if (label) { label.classList.add('font-semibold'); label.classList.remove('font-medium'); }
-    } else {
-      btn.classList.add('text-slate-400');
-      btn.classList.remove('text-emerald-400', 'font-semibold');
-      if (icon) { icon.classList.remove('scale-105'); icon.classList.add('scale-100'); }
-      if (label) { label.classList.remove('font-semibold'); label.classList.add('font-medium'); }
+    if (icon) {
+      icon.classList.toggle('scale-105',  active);
+      icon.classList.toggle('scale-100', !active);
+    }
+    if (label) {
+      label.classList.toggle('font-semibold', active);
+      label.classList.toggle('font-medium',  !active);
     }
   });
+}
 
-  // === ДВИГАЕМ ПИЛЮЛЮ ===
-  const activeBtn = document.querySelector(`.tab-btn[data-tab="${name}"]`);
-  const pill = document.getElementById('tab-pill');
-  const tabbar = document.getElementById('tabbar-container');
-  if (activeBtn && pill && tabbar) {
-    const tabRect = activeBtn.getBoundingClientRect();
-    const parentRect = tabbar.getBoundingClientRect();
-    const offsetLeft = tabRect.left - parentRect.left;
-    const width = tabRect.width;
-    pill.style.left = `${offsetLeft}px`;
-    pill.style.width = `${width}px`;
-    pill.style.opacity = '1';
-  }
-
-  // === ЗАГРУЗКА ДАННЫХ ===
+/** Ленивая подгрузка данных при активации вкладки */
+function loadTabData(name) {
   if (name === 'dashboard')   loadDashboard();
   if (name === 'screenshots') loadQueue();
   if (name === 'calculator')  loadCalcDefaults();
   if (name === 'history')     loadHistory();
   if (name === 'settings')    loadSettings();
+}
+
+/** ЕДИНАЯ ТОЧКА ПРАВДЫ — и свайп, и клик по табу идут сюда */
+function goToTab(index, animated = true) {
+  if (!trackEl) return;
+
+  index = Math.max(0, Math.min(TAB_COUNT - 1, index));
+  const prevIndex = currentIndex;
+  currentIndex = index;
+
+  // Сдвиг трека
+  if (animated) trackEl.classList.add('carousel-transition');
+  else          trackEl.classList.remove('carousel-transition');
+
+  trackEl.style.transform = `translate3d(${-index * 20}%, 0, 0)`;
+
+  // Подсветка кнопок + пилюля
+  setActiveTabVisuals(index);
+  movePill(tabBtns[index], animated);
+
+  // brand-bar только на «Обзор»
+  if (brandBar) brandBar.classList.toggle('hidden', TAB_ORDER[index] !== 'dashboard');
+
+  // Ленивая загрузка только при реальной смене
+  if (prevIndex !== index) {
+    loadTabData(TAB_ORDER[index]);
+  }
+}
+
+// Публичный API — обратная совместимость со старыми onclick="switchTab('...')"
+window.switchTab = function(name) {
+  const i = TAB_ORDER.indexOf(name);
+  if (i >= 0) goToTab(i, true);
+};
+window.__goToTab = goToTab;
+
+// --- ЖЕСТЫ ---
+function onSwipeStart(e) {
+  if (!viewportEl) return;
+  measureViewport();
+  isDragging = true;
+  isHorizontalGesture = null;
+  const t = e.touches ? e.touches[0] : e;
+  startX = t.clientX;
+  startY = t.clientY;
+  currentDeltaX = 0;
+  trackEl.classList.remove('carousel-transition');
+}
+
+function onSwipeMove(e) {
+  if (!isDragging) return;
+  const t = e.touches ? e.touches[0] : e;
+  const dx = t.clientX - startX;
+  const dy = t.clientY - startY;
+
+  if (isHorizontalGesture === null) {
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+      isHorizontalGesture = Math.abs(dx) > Math.abs(dy);
+    }
+  }
+  if (!isHorizontalGesture) return;
+  if (e.cancelable) e.preventDefault();
+
+  viewportEl.classList.add('dragging-active');
+  currentDeltaX = dx;
+
+  let eff = dx;
+  if ((currentIndex === 0 && dx > 0) ||
+      (currentIndex === TAB_COUNT - 1 && dx < 0)) {
+    eff = dx * 0.28;
+  }
+
+  const base  = -(currentIndex * 20);
+  const shift = (eff / viewportWidth) * 20;
+  trackEl.style.transform = `translate3d(${base + shift}%, 0, 0)`;
+}
+
+function onSwipeEnd() {
+  if (!isDragging) return;
+  isDragging = false;
+  if (viewportEl) viewportEl.classList.remove('dragging-active');
+
+  if (isHorizontalGesture) {
+    const threshold = Math.min(viewportWidth * 0.2, 70);
+    if (currentDeltaX < -threshold && currentIndex < TAB_COUNT - 1) {
+      goToTab(currentIndex + 1, true);
+    } else if (currentDeltaX > threshold && currentIndex > 0) {
+      goToTab(currentIndex - 1, true);
+    } else {
+      goToTab(currentIndex, true);
+    }
+  }
+  isHorizontalGesture = null;
+  currentDeltaX = 0;
+}
+
+function bindSwipeGestures() {
+  if (!viewportEl) return;
+
+  viewportEl.addEventListener('touchstart',  onSwipeStart, { passive: true });
+  viewportEl.addEventListener('touchmove',   onSwipeMove,  { passive: false });
+  viewportEl.addEventListener('touchend',    onSwipeEnd,   { passive: true });
+  viewportEl.addEventListener('touchcancel', onSwipeEnd,   { passive: true });
+
+  // Мышь (десктоп-превью)
+  viewportEl.addEventListener('mousedown', (e) => {
+    onSwipeStart(e);
+    const mm = (ev) => onSwipeMove(ev);
+    const mu = () => {
+      onSwipeEnd();
+      window.removeEventListener('mousemove', mm);
+      window.removeEventListener('mouseup', mu);
+    };
+    window.addEventListener('mousemove', mm);
+    window.addEventListener('mouseup', mu);
+  });
+
+  // Клики по кнопкам таб-бара (data-tab-index)
+  tabBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.dataset.tabIndex);
+      if (!Number.isNaN(i)) goToTab(i, true);
+    });
+  });
+
+  window.addEventListener('resize', () => {
+    measureViewport();
+    movePill(tabBtns[currentIndex], false);
+  });
 }
 
 // === Dashboard ===
@@ -598,11 +730,11 @@ function updateQueueButtons(list, hasPendingCash) {
   const canCalc  = hasShots && !hasPendingCash;
 
   btnCalc.disabled = !canCalc;
-  btnCalc.classList.toggle('opacity-40',    !canCalc);
+  btnCalc.classList.toggle('opacity-40',         !canCalc);
   btnCalc.classList.toggle('cursor-not-allowed', !canCalc);
 
   btnClear.disabled = !hasShots;
-  btnClear.classList.toggle('opacity-40',    !hasShots);
+  btnClear.classList.toggle('opacity-40',         !hasShots);
   btnClear.classList.toggle('cursor-not-allowed', !hasShots);
 
   const hint = document.getElementById('queue-hint');
@@ -744,8 +876,9 @@ function goToCalculation() {
   if (btnCalc && btnCalc.disabled) {
     return toast('❌ Сначала загрузите скрины', 'error');
   }
-  switchTab('calculator');
+  goToTab(TAB_ORDER.indexOf('calculator'), true);
 }
+window.goToCalculation = goToCalculation;
 
 // === Upload ===
 document.getElementById('file-input').addEventListener('change', async (e) => {
@@ -862,7 +995,6 @@ function fileToBase64Compressed(file) {
 // === Calculator ===
 let calcDefaults = null;
 let queueTotals = { gross: 0, net: 0, cash: 0, bonuses: 0 };
-// true, когда пользователь сам ввёл «Базу бонусов» (тогда не перезаписываем из очереди)
 let promoManual = false;
 
 function resetCalcInputs() {
@@ -899,9 +1031,6 @@ async function loadCalcDefaults(force = false) {
 
     applyCalcMode(calcDefaults.mode);
 
-    // ZUS-тумблер НЕ трогаем: выбор пользователя сохраняется при смене вкладок.
-    // Сбрасывается только после успешного saveReport (см. resetCalcInputs).
-
     if (calcDefaults.mode !== 'lite') {
       document.getElementById('in-dep-rate').value = calcDefaults.depRate;
     }
@@ -920,7 +1049,6 @@ async function loadCalcDefaults(force = false) {
         document.getElementById('in-net').value   = queueTotals.net.toFixed(2);
         document.getElementById('in-cash').value  = queueTotals.cash.toFixed(2);
 
-        // Бонусы из очереди подставляем, пока пользователь не правил поле сам
         const promoEl = document.getElementById('in-promo-base');
         if (promoEl && !promoManual) promoEl.value = queueTotals.bonuses.toFixed(2);
       } else {
@@ -963,21 +1091,19 @@ function recalc() {
   const fuelCost   = includeFuel ? fuel : 0;
   const netCash    = cardPayout + cash;
   const netFuel    = netCash - fuelCost;
-  
-  // ✅ ИСПРАВЛЕНО: вычитаем топливо и амортизацию
   const netFull    = netCash - fuelCost - dep;
 
-  document.getElementById('p-gross').textContent    = fmt(gross);
+  document.getElementById('p-gross').textContent     = fmt(gross);
   document.getElementById('p-net-input').textContent = fmt(net);
-  document.getElementById('p-vat').textContent      = '-' + fmt(partnerVat);
-  document.getElementById('p-bonustax').textContent = '-' + fmt(promoTax);
-  document.getElementById('p-fee').textContent      = '-' + fmt(s.weeklyFee);
-  document.getElementById('p-zus').textContent      = '-' + fmt(zus);
-  document.getElementById('p-cash').textContent     = '-' + fmt(cash);
-  document.getElementById('p-card').textContent     = fmt(cardPayout);
-  document.getElementById('p-fuel').textContent     = '-' + fmt(fuelCost);
-  document.getElementById('p-dep').textContent      = '-' + fmt(dep);
-  document.getElementById('p-net').textContent      = fmt(netFull);
+  document.getElementById('p-vat').textContent       = '-' + fmt(partnerVat);
+  document.getElementById('p-bonustax').textContent  = '-' + fmt(promoTax);
+  document.getElementById('p-fee').textContent       = '-' + fmt(s.weeklyFee);
+  document.getElementById('p-zus').textContent       = '-' + fmt(zus);
+  document.getElementById('p-cash').textContent      = '-' + fmt(cash);
+  document.getElementById('p-card').textContent      = fmt(cardPayout);
+  document.getElementById('p-fuel').textContent      = '-' + fmt(fuelCost);
+  document.getElementById('p-dep').textContent       = '-' + fmt(dep);
+  document.getElementById('p-net').textContent       = fmt(netFull);
   document.getElementById('calc-hero-net').textContent  = fmt(netFull);
   document.getElementById('calc-hero-card').textContent = fmt(cardPayout);
 }
@@ -988,7 +1114,6 @@ function recalc() {
     if (el) el.addEventListener('input', recalc);
   });
 
-// Ручной ввод базы бонусов (программная подстановка value событие input не вызывает)
 (function () {
   const el = document.getElementById('in-promo-base');
   if (el) el.addEventListener('input', () => { promoManual = true; });
@@ -1025,12 +1150,13 @@ async function saveReport() {
 
       resetCalcInputs();
       toast('✅ Отчёт сохранён. Очередь очищена.');
-      setTimeout(() => switchTab('dashboard'), 800);
+      setTimeout(() => goToTab(TAB_ORDER.indexOf('dashboard'), true), 800);
     } catch (err) {
       toast('❌ ' + err.message, 'error');
     }
   }, 'Расчёт...');
 }
+window.saveReport = saveReport;
 
 // === Settings ===
 async function loadSettings() {
@@ -1120,6 +1246,7 @@ async function saveSettings() {
     }
   }, 'Сохранение...');
 }
+window.saveSettings = saveSettings;
 
 async function resetSettings() {
   if (!confirm('Сбросить настройки к дефолтным?')) return;
@@ -1141,7 +1268,7 @@ async function resetSettings() {
     }
   }, 'Сброс...');
 }
-
+window.resetSettings = resetSettings;
 
 // === History ===
 async function loadHistory(force = false) {
@@ -1188,9 +1315,8 @@ function renderHistory(list) {
     const plat = r.platform || '—';
     const period = r.dateRange || '—';
     const isPro = modeLabel === 'pro';
-    const isFirst = i === 0; // первая карточка — большая (текущая)
+    const isFirst = i === 0;
 
-    // Расчёт стоимости топлива на 100 км
     let fuelCostPer100 = '—';
     if (r.km > 0 && r.fuel > 0) {
       fuelCostPer100 = ((r.fuel / r.km) * 100).toFixed(2).replace('.', ',') + ' zł / 100 км';
@@ -1198,7 +1324,6 @@ function renderHistory(list) {
 
     const totalTaxes = (r.partnerVat || 0) + (r.bonusTax || 0) + (r.partnerFee || 0) + (r.zus || 0);
 
-    // Блок расходов на авто (только для PRO)
     let carBlock = '';
     if (isPro) {
       carBlock = `
@@ -1223,12 +1348,9 @@ function renderHistory(list) {
         </div>`;
     }
 
-    // ============ БОЛЬШАЯ КАРТОЧКА (первая, "текущая неделя") ============
     if (isFirst) {
       return `
         <article class="history-card bg-app-card rounded-2xl border border-emerald-500/25 shadow-lg shadow-black/40 overflow-hidden mb-3 cursor-pointer" data-index="${i}">
-          
-          <!-- Шапка -->
           <div class="p-4 bg-gradient-to-b from-app-surface/90 to-app-card border-b border-app-border/60 flex items-center justify-between">
             <div class="flex flex-wrap items-center gap-2">
               <div class="flex items-center gap-1.5 bg-slate-900/80 px-2.5 py-1 rounded-md border border-slate-700/60 text-xs font-semibold text-slate-200">
@@ -1241,7 +1363,6 @@ function renderHistory(list) {
             <span class="material-symbols-outlined text-slate-400 history-chevron text-xl">expand_less</span>
           </div>
 
-          <!-- KPI-блоки -->
           <div class="p-4 bg-app-card/60 grid grid-cols-2 gap-3 border-b border-app-border/40">
             <div class="bg-app-surface/60 rounded-xl p-3 border border-emerald-500/20 relative overflow-hidden">
               <div class="text-[11px] uppercase tracking-wider font-semibold text-emerald-400/90 mb-1 flex items-center gap-1">
@@ -1263,10 +1384,7 @@ function renderHistory(list) {
             </div>
           </div>
 
-          <!-- Развёрнутая часть -->
           <div class="history-details">
-            
-            <!-- Блок 1: Доход -->
             <div class="px-4 py-3 border-b border-app-border/40 space-y-2.5">
               <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
                 <span>Доход от заказов</span>
@@ -1294,7 +1412,6 @@ function renderHistory(list) {
 
             ${carBlock}
 
-            <!-- Блок 3: Налоги -->
             <div class="px-4 py-3 border-b border-app-border/40 space-y-2.5">
               <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
                 <span>Налоги и комиссии</span>
@@ -1320,7 +1437,6 @@ function renderHistory(list) {
               </div>
             </div>
 
-            <!-- Блок 4: Распределение -->
             <div class="p-3 bg-app-surface/80 m-3 rounded-xl border border-app-border space-y-2">
               <div class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 flex items-center gap-1.5">
                 <span class="material-symbols-outlined text-sm text-emerald-400">credit_card</span>
@@ -1347,7 +1463,6 @@ function renderHistory(list) {
       `;
     }
 
-    // ============ КОМПАКТНАЯ КАРТОЧКА (все остальные) ============
     return `
       <article class="history-card bg-app-card rounded-xl p-3.5 border border-app-border/80 hover:border-slate-700 transition mb-2.5 cursor-pointer" data-index="${i}">
         <div class="flex items-center justify-between">
@@ -1365,10 +1480,7 @@ function renderHistory(list) {
           <span class="material-symbols-outlined text-slate-400 history-chevron text-xl">expand_more</span>
         </div>
 
-        <!-- Развёрнутая часть (скрыта по умолчанию, раскрывается по клику) -->
         <div class="history-details hidden mt-3 pt-3 border-t border-app-border/40">
-          
-          <!-- Блок 1: Доход -->
           <div class="space-y-2.5 mb-3">
             <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
               <span>Доход от заказов</span>
@@ -1395,7 +1507,6 @@ function renderHistory(list) {
 
           ${isPro ? carBlock : ''}
 
-          <!-- Блок 3: Налоги -->
           <div class="space-y-2.5 mt-3">
             <div class="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wide">
               <span>Налоги и комиссии</span>
@@ -1421,7 +1532,6 @@ function renderHistory(list) {
             </div>
           </div>
 
-          <!-- Блок 4: Распределение -->
           <div class="mt-3 p-2.5 bg-app-surface/80 rounded-lg border border-app-border space-y-1.5">
             <div class="flex justify-between items-center text-xs">
               <span class="text-slate-400">На карту:</span>
@@ -1441,7 +1551,6 @@ function renderHistory(list) {
     `;
   }).join('');
 
-  // === Слушатели на клик по карточке ===
   container.querySelectorAll('.history-card').forEach(card => {
     card.addEventListener('click', (e) => {
       if (e.target.closest('button')) return;
@@ -1462,7 +1571,6 @@ function renderHistory(list) {
     });
   });
 
-  // === Итоговая сводка ===
   const recent = list.slice(0, 4);
   const s = { card: 0, cash: 0, net: 0, netFuel: 0, netFull: 0 };
   recent.forEach(r => {
@@ -1491,8 +1599,8 @@ let currentBase = 'gross';
 function setActiveMode(mode) {
   currentMode = mode;
 
-  const lite = document.getElementById('set-lite');
-  const pro  = document.getElementById('set-pro');
+  const lite  = document.getElementById('set-lite');
+  const pro   = document.getElementById('set-pro');
   const hLite = document.getElementById('hdr-lite');
   const hPro  = document.getElementById('hdr-pro');
 
@@ -1569,7 +1677,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     tg.setHeaderColor && tg.setHeaderColor('#10141a');
     tg.setBackgroundColor && tg.setBackgroundColor('#10141a');
 
-    // === SAFE-AREA FIX ===
     applyTelegramInsets();
 
     if (tg.onEvent) {
@@ -1580,6 +1687,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   bindSettingsDirtyTracking();
+  bindSwipeGestures();
 
   PROGRESS.show();
   PROGRESS.set(15);
@@ -1595,7 +1703,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     CACHE.set('GET:dashboard:{}', cachedDash);
     renderDashboard(cachedDash);
     hideSkeleton('dashboard');
-    switchTab('dashboard');
+    goToTab(0, false);
     PROGRESS.set(60);
   }
 
@@ -1614,7 +1722,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
 
     if (!cachedDash) {
-      switchTab('dashboard');
+      goToTab(0, false);
     }
 
     PROGRESS.set(100);
@@ -1622,21 +1730,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     showError('Не удалось подключиться к API: ' + err.message);
   } finally {
     PROGRESS.done();
-     
-// ═══ НОВОЕ: принудительный пересчёт позиции пилюли после полной загрузки ═══
+
+    // Позиционируем пилюлю после полной загрузки
     setTimeout(() => {
-      const initialTab = document.querySelector('.tab-btn[data-tab="dashboard"]');
-      const pill = document.getElementById('tab-pill');
-      const tabbar = document.getElementById('tabbar-container');
-      if (initialTab && pill && tabbar) {
-        const tabRect = initialTab.getBoundingClientRect();
-        const parentRect = tabbar.getBoundingClientRect();
-        pill.style.transition = 'none';
-        pill.style.left = `${tabRect.left - parentRect.left}px`;
-        pill.style.width = `${tabRect.width}px`;
-        pill.style.opacity = '1';
-        setTimeout(() => { pill.style.transition = ''; }, 100);
-      }
+      measureViewport();
+      movePill(tabBtns[currentIndex], false);
     }, 100);
   }
 });
