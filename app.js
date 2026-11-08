@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v28.7 — калькулятор: ZUS не сбрасывается, promo-base без залипания
+   v29.1 — исправлен "реальный профит": вычитаем топливо и амортизацию
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -10,7 +10,7 @@ const tg = window.Telegram && window.Telegram.WebApp;
 const initData = tg ? (tg.initData || '') : '';
 
 // === CACHE VERSION — автосброс старого кэша при обновлении ===
-const APP_VERSION = 'v29';
+const APP_VERSION = 'v29.1';
 try {
   const stored = localStorage.getItem('mt:appVersion');
   if (stored !== APP_VERSION) {
@@ -112,21 +112,9 @@ function hideLoading() {
 }
 
 // === TELEGRAM SAFE-AREA INSETS ===
-/**
- * Применяет реальные insets от Telegram (Bot API 8.0+).
- * Кладёт их в CSS-переменные --tg-inset-*.
- * Если версия Telegram < 8.0 — тихо выходим, остаются env(safe-area-*).
- *
- * ВАЖНО: в fullscreen Telegram рисует собственную overlay-шапку (~56px)
- * поверх контента, но safeAreaInset.top даёт только статус-бар
- * (38 на Android / 44 на iPhone). Реальная высота = max(safeAreaInset.top, 56).
- */
 function applyTelegramInsets() {
   if (!tg) return;
-
   const hasApi = tg.isVersionAtLeast && tg.isVersionAtLeast('8.0');
-
-  // Резервный путь: если API нет — используем системные env(safe-area-inset-*)
   if (!hasApi && !tg.safeAreaInset) return;
 
   const inset = tg.safeAreaInset || {};
@@ -137,8 +125,6 @@ function applyTelegramInsets() {
   const left   = Math.max(0, Math.round(inset.left   || 0));
   const right  = Math.max(0, Math.round(inset.right  || 0));
 
-  // В fullscreen шапка Telegram перекрывает контент, но safeAreaInset.top
-  // возвращает только системный статус-бар. Реальная высота = max(inset.top, 56).
   if (tg.isFullscreen && top < 56) {
     top = 56;
   }
@@ -148,7 +134,6 @@ function applyTelegramInsets() {
   root.style.setProperty('--tg-inset-left',   left   + 'px');
   root.style.setProperty('--tg-inset-right',  right  + 'px');
 
-  // Стабильная высота viewport (не прыгает при открытой клавиатуре)
   if (tg.viewportStableHeight) {
     root.style.setProperty('--tg-vh', tg.viewportStableHeight + 'px');
   }
@@ -220,7 +205,7 @@ function showSkeleton(name) {
     const c = document.getElementById('dash-content');
     if (c) { c.classList.add('hidden'); c.classList.remove('flex'); }
   }
-     if (name === 'history') {
+  if (name === 'history') {
     const c = document.getElementById('history-content');
     if (c) { c.classList.add('hidden'); c.classList.remove('flex'); }
   }
@@ -237,7 +222,7 @@ function hideSkeleton(name) {
     const c = document.getElementById('dash-content');
     if (c) { c.classList.remove('hidden'); c.classList.add('flex'); }
   }
-     if (name === 'history') {
+  if (name === 'history') {
     const c = document.getElementById('history-content');
     if (c) { c.classList.remove('hidden'); c.classList.add('flex'); }
   }
@@ -320,7 +305,7 @@ async function apiGet(action, params = {}, opts = {}) {
     if (data.ok) {
       CACHE.set(key, data);
       if (action === 'dashboard') LS.set('dashboard', data);
-       if (action === 'history')   LS.set('history', data);
+      if (action === 'history')   LS.set('history', data);
       if (action === 'settings')  LS.set('settings', data);
     }
     return data;
@@ -387,7 +372,7 @@ function switchTab(name) {
   if (name === 'dashboard')   loadDashboard();
   if (name === 'screenshots') loadQueue();
   if (name === 'calculator')  loadCalcDefaults();
-     if (name === 'history')     loadHistory();
+  if (name === 'history')     loadHistory();
   if (name === 'settings')    loadSettings();
 }
 
@@ -450,9 +435,9 @@ function renderDashboard(data) {
       sparkTitle.textContent = 'Последние ' + sparkN + ' ' + pluralWeeksShort(sparkN);
     }
 
-    const max = Math.max(...spark.map(s => Number(s.net) || 0), 1);
+    const max = Math.max(...spark.map(s => Number(s.netFull) || 0), 1);
     container.innerHTML = spark.map(s => {
-      const netVal = Number(s.net) || 0;
+      const netVal = Number(s.netFull) || 0;
       const h = Math.max(4, Math.round(netVal / max * 70));
       const ttl = esc((s.period || '') + ': ' + fmt(netVal));
       const label = netVal > 0 ? Math.round(netVal) : '';
@@ -944,7 +929,9 @@ function recalc() {
   const fuelCost   = includeFuel ? fuel : 0;
   const netCash    = cardPayout + cash;
   const netFuel    = netCash - fuelCost;
-  const netFull    = netCash - dep;
+  
+  // ✅ ИСПРАВЛЕНО: вычитаем топливо и амортизацию
+  const netFull    = netCash - fuelCost - dep;
 
   document.getElementById('p-gross').textContent    = fmt(gross);
   document.getElementById('p-net-input').textContent = fmt(net);
@@ -1126,7 +1113,6 @@ async function resetSettings() {
 async function loadHistory(force = false) {
   hideError();
 
-  // Скелетон
   showSkeleton('history');
 
   try {
@@ -1218,7 +1204,6 @@ function renderHistory(list) {
   // === Слушатели на клик по карточке ===
   container.querySelectorAll('.history-card').forEach(card => {
     card.addEventListener('click', (e) => {
-      // Игнорируем клик по кнопкам внутри (если будут)
       if (e.target.closest('button')) return;
 
       const details = card.querySelector('.history-details');
