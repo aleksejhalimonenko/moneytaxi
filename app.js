@@ -1,7 +1,8 @@
 /* ═══════════════════════════════════════════════════
    MoneyTaxi WebApp — frontend logic
-   v30.3 — stacked bar chart, swipe-карусель,
-           унифицированная история (без большой карточки)
+   v30.4 — stacked bar chart, swipe-карусель,
+           унифицированная история,
+           brand-bar удалён (переключение режима только в настройках)
    ═══════════════════════════════════════════════════ */
 
 const API_URL = 'https://script.google.com/macros/s/AKfycby2d4bxoQXLz-lBXz5RRmNimhuy64n6Gq-AWvuYlla0VAz6SUoxKcq1eRD2-M1bpGQW/exec';
@@ -350,7 +351,7 @@ let currentIndex = 0;
 const viewportEl = document.getElementById('swipe-viewport');
 const trackEl    = document.getElementById('swipe-track');
 const tabBtns    = Array.from(document.querySelectorAll('.tab-btn'));
-const brandBar   = document.getElementById('brand-bar');
+const brandBar   = document.getElementById('brand-bar'); // null после удаления из HTML — это ок
 
 let isDragging        = false;
 let startX            = 0;
@@ -429,6 +430,7 @@ function goToTab(index, animated = true) {
   setActiveTabVisuals(index);
   movePill(tabBtns[index], animated);
 
+  // brand-bar удалён из HTML — if (brandBar) защищает от ошибки
   if (brandBar) brandBar.classList.toggle('hidden', TAB_ORDER[index] !== 'dashboard');
 
   if (prevIndex !== index) {
@@ -1569,14 +1571,14 @@ function setActiveMode(mode) {
 
   const lite  = document.getElementById('set-lite');
   const pro   = document.getElementById('set-pro');
-  const hLite = document.getElementById('hdr-lite');
-  const hPro  = document.getElementById('hdr-pro');
+  const hLite = document.getElementById('hdr-lite'); // null после удаления из HTML
+  const hPro  = document.getElementById('hdr-pro');  // null после удаления из HTML
 
   // Кнопки в панели настроек — компактные
   const onSet  = 'flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]';
   const offSet = 'flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white';
 
-  // Кнопки в шапке — как были
+  // Кнопки в шапке — как были (не используются, но на всякий случай)
   const onHdr  = 'px-2 py-1 rounded-full bg-primary text-on-primary font-mono text-[10px] font-bold uppercase transition-all';
   const offHdr = 'px-2 py-1 rounded-full text-on-surface-variant font-mono text-[10px] font-semibold uppercase hover:text-on-surface transition-all';
 
@@ -1627,16 +1629,24 @@ document.getElementById('set-base-net').addEventListener('click', async () => {
   if (r.ok) calcDefaults = r.settings;
 });
 
-document.getElementById('hdr-lite').addEventListener('click', async () => {
-  setActiveMode('lite');
-  const r = await apiPost('saveSettings', { settings: { mode: 'lite' } });
-  if (r.ok) calcDefaults = r.settings;
-});
-document.getElementById('hdr-pro').addEventListener('click', async () => {
-  setActiveMode('pro');
-  const r = await apiPost('saveSettings', { settings: { mode: 'pro' } });
-  if (r.ok) calcDefaults = r.settings;
-});
+// === Слушатели hdr-lite / hdr-pro (null-guard, т.к. кнопки удалены из HTML) ===
+const hdrLiteBtn = document.getElementById('hdr-lite');
+const hdrProBtn  = document.getElementById('hdr-pro');
+
+if (hdrLiteBtn) {
+  hdrLiteBtn.addEventListener('click', async () => {
+    setActiveMode('lite');
+    const r = await apiPost('saveSettings', { settings: { mode: 'lite' } });
+    if (r.ok) calcDefaults = r.settings;
+  });
+}
+if (hdrProBtn) {
+  hdrProBtn.addEventListener('click', async () => {
+    setActiveMode('pro');
+    const r = await apiPost('saveSettings', { settings: { mode: 'pro' } });
+    if (r.ok) calcDefaults = r.settings;
+  });
+}
 
 // === Init ===
 window.addEventListener('DOMContentLoaded', async () => {
