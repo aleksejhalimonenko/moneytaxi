@@ -19,7 +19,7 @@ tailwind.config = {
   darkMode: "class",
   theme: { extend: {
     colors: {
-      // ─── Твои существующие цвета ───
+      // ─── Существующие цвета ───
       "surface":"#10141a","surface-dim":"#10141a",
       "surface-container-lowest":"#0a0e14","surface-container-low":"#181c22",
       "surface-container":"#1c2026","surface-container-high":"#262a31",
@@ -36,7 +36,7 @@ tailwind.config = {
       "outline":"#849589","outline-variant":"#3b4a41",
       "background":"#10141a","on-background":"#dfe2eb",
 
-      // ─── НОВЫЕ цвета из прототипа истории ───
+      // ─── Новые цвета из прототипа истории ───
       "app": {
         "bg":      "#0A0E17",
         "card":    "#131B26",
@@ -66,7 +66,7 @@ tailwind.config = {
     min-height: -webkit-fill-available;
   }
 
-  /* === SAFE AREA: max из системного env() и Telegram safeAreaInset === */
+  /* === SAFE AREA === */
   .pb-safe {
     padding-bottom: max(
       env(safe-area-inset-bottom, 0px),
@@ -90,7 +90,6 @@ tailwind.config = {
   input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   input[type=number] { -moz-appearance: textfield; }
 
-  /* Skeleton shimmer */
   .skeleton {
     background: linear-gradient(90deg, #1c2026 0%, #262a31 50%, #1c2026 100%);
     background-size: 200% 100%;
@@ -102,9 +101,7 @@ tailwind.config = {
     100% { background-position: -200% 0; }
   }
 
-    /* ═══════════════════════════════════════════ */
-  /* FLOATING LIQUID GLASS TAB BAR               */
-  /* ═══════════════════════════════════════════ */
+  /* ═══ LIQUID GLASS TAB BAR ═══ */
   .liquid-glass-tabbar {
     background: rgba(15, 23, 42, 0.75);
     backdrop-filter: blur(24px) saturate(190%);
@@ -120,7 +117,6 @@ tailwind.config = {
 </head>
 <body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
 
-<!-- Header смещён на safe-area сверху -->
 <header class="fixed inset-x-0 z-50 bg-surface/85 backdrop-blur-xl shadow-[0_1px_12px_rgba(0,0,0,0.3)]"
         style="top: var(--tg-inset-top, env(safe-area-inset-top, 0px))">
   <div class="h-16 px-4 flex items-center justify-between gap-3">
@@ -138,13 +134,12 @@ tailwind.config = {
   </div>
 </header>
 
-<!-- Прогресс-бар смещён на safe-area + высота header -->
 <div id="progress-bar"
      class="fixed inset-x-0 h-0.5 bg-primary z-40 transition-all duration-200 pointer-events-none"
      style="top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 64px); width:0%; opacity:0"></div>
 
-<!-- Main с padding-top = safe-area + высота header -->
-<main class="flex-1 w-full pb-24 px-4"
+<!-- ✅ ШАГ 6: pb-24 → pb-32 (чтобы контент не уходил под плавающую панель) -->
+<main class="flex-1 w-full pb-32 px-4"
       style="padding-top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 80px)">
 
   <div id="loading" class="flex items-center justify-center py-20">
@@ -159,7 +154,6 @@ tailwind.config = {
   <!-- ═════════ TAB: DASHBOARD ═════════ -->
   <section id="tab-dashboard" class="hidden flex-col gap-4">
 
-    <!-- Skeleton Dashboard -->
     <div id="skeleton-dashboard" class="hidden flex-col gap-4">
       <div class="flex items-center justify-between">
         <div class="skeleton h-6 w-24"></div>
@@ -211,7 +205,6 @@ tailwind.config = {
       </div>
     </div>
 
-    <!-- Реальный контент Dashboard -->
     <div id="dash-content" class="hidden flex-col gap-4">
       <div class="flex items-center justify-between">
         <h2 class="font-headline text-xl font-semibold">Обзор</h2>
@@ -237,13 +230,11 @@ tailwind.config = {
               <div id="dash-net-cash" class="font-mono text-2xl font-bold text-primary">0,00 zł</div>
             </div>
 
-            <!-- Lite: Нал -->
             <div data-mode="lite-only" class="text-right">
               <div class="font-mono text-[10px] text-on-surface-variant uppercase">Нал</div>
               <div id="dash-hero-cash" class="font-mono text-xl font-bold text-tertiary">0,00 zł</div>
             </div>
 
-            <!-- Pro: Профит -->
             <div data-mode="pro-only" class="text-right">
               <div class="font-mono text-[10px] text-on-surface-variant uppercase">Профит</div>
               <div id="dash-net-full" class="font-mono text-xl font-bold text-secondary">0,00 zł</div>
@@ -307,7 +298,6 @@ tailwind.config = {
       <span id="queue-count" class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] text-primary">0</span>
     </div>
 
-    <!-- Upload zone -->
     <label for="file-input" id="drop-zone" class="cursor-pointer bg-surface-container border-2 border-dashed border-outline-variant hover:border-primary/40 rounded-xl p-6 flex flex-col items-center gap-2 transition-all">
       <span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
       <div class="font-headline text-base font-semibold">Загрузить скриншоты</div>
@@ -317,7 +307,6 @@ tailwind.config = {
 
     <div id="upload-status" class="hidden rounded-lg bg-surface-container-low p-3 font-mono text-xs"></div>
 
-    <!-- Skeleton Queue -->
     <div id="skeleton-queue" class="hidden flex-col gap-3">
       <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2">
         <div class="flex gap-2">
@@ -343,7 +332,6 @@ tailwind.config = {
       </div>
     </div>
 
-    <!-- Queue list -->
     <div id="queue-list" class="flex flex-col gap-3"></div>
 
     <div id="queue-empty" class="hidden text-center text-on-surface-variant py-8">
@@ -351,17 +339,14 @@ tailwind.config = {
       <p>Очередь пуста. Загрузите скриншоты от Uber / Bolt.</p>
     </div>
 
-    <!-- Hint про pending cash -->
     <div id="queue-hint" class="hidden font-mono text-[10px] text-tertiary text-center"></div>
 
-    <!-- Кнопка: Рассчитать -->
     <button id="btn-go-calc" onclick="goToCalculation()" disabled
             class="w-full h-12 rounded-xl bg-secondary text-on-secondary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
       <span class="material-symbols-outlined">calculate</span>
       Рассчитать
     </button>
 
-    <!-- Кнопка: Удалить все -->
     <button id="btn-clear-queue" onclick="clearQueue()" disabled
             class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
       <span class="material-symbols-outlined text-base">delete_sweep</span>
@@ -376,7 +361,6 @@ tailwind.config = {
       <button onclick="loadCalcDefaults(true)" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
     </div>
 
-    <!-- Hero badge -->
     <div class="bg-surface-container-high rounded-xl p-4 flex items-center justify-between">
       <div>
         <div class="font-mono text-[10px] text-on-surface-variant uppercase">Реальный профит</div>
@@ -388,7 +372,6 @@ tailwind.config = {
       </div>
     </div>
 
-    <!-- Inputs -->
     <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
       <div class="flex flex-col gap-1">
         <label class="font-mono text-[10px] text-on-surface-variant uppercase">Брутто (из скринов)</label>
@@ -456,7 +439,6 @@ tailwind.config = {
       </label>
     </div>
 
-    <!-- Preview -->
     <div class="bg-surface-container rounded-xl p-4 flex flex-col gap-2 font-mono text-sm">
       <div class="flex justify-between"><span class="text-on-surface-variant">Брутто:</span><span id="p-gross" class="font-semibold">0,00 zł</span></div>
       <div class="flex justify-between"><span class="text-on-surface-variant">Нетто:</span><span id="p-net-input" class="font-semibold">0,00 zł</span></div>
@@ -485,7 +467,6 @@ tailwind.config = {
 
   <!-- ═════════ TAB: HISTORY ═════════ -->
   <section id="tab-history" class="hidden flex-col gap-4">
-    <!-- Skeleton -->
     <div id="skeleton-history" class="hidden flex-col gap-3">
       <div class="flex items-center justify-between">
         <div class="skeleton h-6 w-24"></div>
@@ -496,7 +477,6 @@ tailwind.config = {
       <div class="skeleton h-20 w-full"></div>
     </div>
 
-    <!-- Контент -->
     <div id="history-content" class="hidden flex-col gap-3">
       <div class="flex items-center justify-between">
         <h2 class="font-headline text-xl font-semibold">История</h2>
@@ -511,7 +491,6 @@ tailwind.config = {
         <button onclick="switchTab('calculator')" class="mt-3 px-4 py-2 rounded-lg bg-primary text-on-primary font-mono font-semibold">Перейти к расчёту</button>
       </div>
 
-      <!-- Итоговая сводка -->
       <div id="history-summary" class="hidden bg-surface-container-low rounded-xl p-4">
         <div id="history-summary-title" class="font-headline text-sm font-semibold mb-3">Итого</div>
         <div class="flex flex-col gap-2 font-mono text-sm">
@@ -528,7 +507,6 @@ tailwind.config = {
   <!-- ═════════ TAB: SETTINGS ═════════ -->
   <section id="tab-settings" class="hidden flex-col gap-4">
 
-    <!-- Skeleton Settings -->
     <div id="skeleton-settings" class="hidden flex-col gap-4">
       <div class="skeleton h-6 w-32"></div>
       <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
@@ -541,7 +519,6 @@ tailwind.config = {
       </div>
     </div>
 
-    <!-- Real settings -->
     <div id="settings-content" class="hidden flex-col gap-4">
       <h2 class="font-headline text-xl font-semibold">Настройки</h2>
 
@@ -602,9 +579,9 @@ tailwind.config = {
 
 </main>
 
-<!-- ═════════ TAB BAR ═════════ -->
 <!-- ═════════ LIQUID GLASS FLOATING TAB BAR ═════════ -->
-<nav class="fixed bottom-4 left-3 right-3 max-w-[408px] mx-auto z-50 pb-safe" style="margin-bottom: max(0px, env(safe-area-inset-bottom))">
+<!-- ✅ ШАГ 5: убран pb-safe, добавлен margin-bottom для safe-area -->
+<nav class="fixed bottom-4 left-3 right-3 max-w-[408px] mx-auto z-50" style="margin-bottom: max(0px, env(safe-area-inset-bottom))">
   <div class="liquid-glass-tabbar relative rounded-[28px] p-1.5 flex items-center justify-between shadow-2xl shadow-black/60 select-none" id="tabbar-container">
     <!-- Animated Sliding Pill Indicator -->
     <div class="pointer-events-none absolute tab-indicator-spring rounded-2xl bg-emerald-500/20 border border-emerald-400/35 shadow-[0_0_18px_rgba(16,185,129,0.3)] inset-y-1.5 z-0 opacity-0" id="tab-pill"></div>
@@ -632,7 +609,6 @@ tailwind.config = {
   </div>
 </nav>
 
-<!-- ═════════ SAVE TOAST (глобальный — поверх всех вкладок) ═════════ -->
 <div id="save-toast" class="hidden fixed bottom-24 left-4 right-4 bg-surface-container-highest text-on-surface p-4 rounded-xl shadow-2xl flex items-center gap-3 z-[100]">
   <span id="save-toast-icon" class="material-symbols-outlined text-primary">cloud_done</span>
   <div class="flex-1 font-mono text-sm">Сохранено</div>
