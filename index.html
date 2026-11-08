@@ -129,6 +129,9 @@ tailwind.config = {
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
+    /* ✅ Запас под таб-бар: при полном скролле последний элемент
+       останавливается над панелью, а «воздух» уходит под неё */
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
 </style>
 </head>
@@ -138,7 +141,7 @@ tailwind.config = {
      class="fixed inset-x-0 h-0.5 bg-primary z-40 transition-all duration-200 pointer-events-none"
      style="top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 0px); width:0%; opacity:0"></div>
 
-<main class="flex-1 min-h-0 w-full pb-32 px-4 overflow-hidden flex flex-col"
+<main class="flex-1 min-h-0 w-full px-4 overflow-hidden flex flex-col"
       style="padding-top: calc(var(--tg-inset-top, env(safe-area-inset-top, 0px)) + 12px)">
 
   <!-- ✅ Брендинг MoneyTaxi + Lite/Pro (вне свайпера, всегда сверху) -->
@@ -171,7 +174,7 @@ tailwind.config = {
 
       <!-- PANEL 0: DASHBOARD -->
       <div class="w-[20%] shrink-0 px-4" data-tab-panel="dashboard">
-        <section id="tab-dashboard" class="flex flex-col gap-4 pb-4">
+        <section id="tab-dashboard" class="flex flex-col gap-4">
 
           <div id="skeleton-dashboard" class="hidden flex-col gap-4">
             <div class="flex items-center justify-between">
@@ -313,7 +316,7 @@ tailwind.config = {
 
       <!-- PANEL 1: SCREENSHOTS -->
       <div class="w-[20%] shrink-0 px-4" data-tab-panel="screenshots">
-        <section id="tab-screenshots" class="flex flex-col gap-4 pb-4">
+        <section id="tab-screenshots" class="flex flex-col gap-4">
           <div class="flex items-center justify-between">
             <h2 class="font-headline text-xl font-semibold">Очередь скринов</h2>
             <span id="queue-count" class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] text-primary">0</span>
@@ -378,7 +381,7 @@ tailwind.config = {
 
       <!-- PANEL 2: CALCULATOR -->
       <div class="w-[20%] shrink-0 px-4" data-tab-panel="calculator">
-        <section id="tab-calculator" class="flex flex-col gap-4 pb-4">
+        <section id="tab-calculator" class="flex flex-col gap-4">
           <div class="flex items-center justify-between">
             <h2 class="font-headline text-xl font-semibold">Расчёт недели</h2>
             <button onclick="loadCalcDefaults(true)" class="font-mono text-[10px] text-primary hover:underline">↻ из настроек</button>
@@ -491,7 +494,7 @@ tailwind.config = {
 
       <!-- PANEL 3: HISTORY -->
       <div class="w-[20%] shrink-0 px-4" data-tab-panel="history">
-        <section id="tab-history" class="flex flex-col gap-4 pb-4">
+        <section id="tab-history" class="flex flex-col gap-4">
           <div id="skeleton-history" class="hidden flex-col gap-3">
             <div class="flex items-center justify-between">
               <div class="skeleton h-6 w-24"></div>
@@ -532,7 +535,7 @@ tailwind.config = {
 
       <!-- PANEL 4: SETTINGS -->
       <div class="w-[20%] shrink-0 px-4" data-tab-panel="settings">
-        <section id="tab-settings" class="flex flex-col gap-4 pb-4">
+        <section id="tab-settings" class="flex flex-col gap-4">
           <div id="skeleton-settings" class="hidden flex-col gap-4">
             <div class="skeleton h-6 w-32"></div>
             <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
