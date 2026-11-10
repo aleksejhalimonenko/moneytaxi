@@ -829,13 +829,10 @@ function updateQueueButtons(list, hasPendingCash) {
   const hasShots = list.length > 0;
   const canCalc  = hasShots && !hasPendingCash;
 
-  btnCalc.disabled = !canCalc;
-  btnCalc.classList.toggle('opacity-40',         !canCalc);
-  btnCalc.classList.toggle('cursor-not-allowed', !canCalc);
-
+  // Кнопки в HTML уже имеют disabled:opacity-40 disabled:cursor-not-allowed —
+  // достаточно только переключать .disabled.
+  btnCalc.disabled  = !canCalc;
   btnClear.disabled = !hasShots;
-  btnClear.classList.toggle('opacity-40',         !hasShots);
-  btnClear.classList.toggle('cursor-not-allowed', !hasShots);
 
   const hint = document.getElementById('queue-hint');
   if (hint) {
@@ -855,10 +852,14 @@ function renderQueue(list) {
 
   if (!list.length) {
     container.innerHTML = '';
+    // Пустое состояние — плашка с иконкой и текстом в одну строку,
+    // центрируется через my-auto. Нужен display:flex — добавляем класс.
     empty.classList.remove('hidden');
+    empty.classList.add('flex');
     return;
   }
   empty.classList.add('hidden');
+  empty.classList.remove('flex');
 
   container.innerHTML = list.map((s, i) => {
     const cashPending = s.isUberStats && s.cashPending;
@@ -1729,9 +1730,6 @@ window.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    // ✅ Явно рендерим дашборд после загрузки (для fresh-кейса)
-    // Это исправляет баг: при первом запуске без кэша "Обзор" не рендерился,
-    // пока юзер не переключится на другую вкладку и обратно.
     if (dash && dash.ok) {
       renderDashboard(dash);
       hideSkeleton('dashboard');
