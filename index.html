@@ -465,10 +465,13 @@ tailwind.config = {
 
           <div id="queue-list" class="flex flex-col gap-3"></div>
 
-          <div id="queue-empty" class="hidden text-center text-on-surface-variant py-8">
-            <span class="material-symbols-outlined text-4xl mb-2">inbox</span>
-            <p>Очередь пуста. Загрузите скриншоты от Uber / Bolt.</p>
-          </div>
+          <div id="queue-empty"
+     class="hidden items-center justify-center gap-2 py-3 px-4
+            bg-surface-container/30 border border-white/5 rounded-xl
+            my-auto text-center">
+  <span class="material-symbols-outlined text-lg text-on-surface-variant/40">inbox</span>
+  <p class="text-xs text-on-surface-variant">Очередь пуста. Добавьте скрины Uber / Bolt</p>
+</div>
 
           <div id="queue-hint" class="hidden font-mono text-[10px] text-tertiary text-center"></div>
 
