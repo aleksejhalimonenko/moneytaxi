@@ -421,19 +421,39 @@ tailwind.config = {
         </section>
       </div>
 
-      <!-- PANEL 1: SCREENSHOTS -->
+      <!-- PANEL 1: SCREENSHOTS (переработано под прототип) -->
       <div class="w-[20%] shrink-0 px-4" data-tab-panel="screenshots">
-        <section id="tab-screenshots" class="flex flex-col gap-4">
-          <div class="flex items-center justify-between">
-            <h2 class="font-headline text-xl font-semibold">Очередь скринов</h2>
-            <span id="queue-count" class="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] text-primary">0</span>
-          </div>
+        <section id="tab-screenshots" class="flex flex-col gap-4 h-full">
 
-          <label for="file-input" id="drop-zone" class="cursor-pointer bg-surface-container border-2 border-dashed border-outline-variant hover:border-primary/40 rounded-xl p-6 flex flex-col items-center gap-2 transition-all">
-            <span class="material-symbols-outlined text-3xl text-primary">cloud_upload</span>
-            <div class="font-headline text-base font-semibold">Загрузить скриншоты</div>
-            <div class="font-mono text-[10px] text-on-surface-variant">PNG, JPG • один или несколько</div>
-            <input id="file-input" type="file" accept="image/*" multiple class="hidden">
+          <!-- Header -->
+          <header class="flex items-center justify-between mt-1 mb-1">
+            <div class="flex items-center gap-3">
+              <span class="material-symbols-outlined text-primary text-2xl">document_scanner</span>
+              <h1 class="font-headline text-xl font-semibold tracking-tight text-white">Очередь скринов</h1>
+            </div>
+            <span id="queue-count"
+                  class="px-2.5 py-0.5 rounded-full bg-surface-container-high
+                         font-mono text-xs font-medium text-primary
+                         border border-primary/20 shadow-sm">
+              0
+            </span>
+          </header>
+
+          <!-- Drop-zone -->
+          <label for="file-input" id="drop-zone"
+                 class="cursor-pointer border-2 border-dashed border-primary/30
+                        hover:border-primary/60 bg-surface-container/60
+                        hover:bg-surface-container/90 transition-all rounded-2xl
+                        p-7 flex flex-col items-center justify-center gap-2
+                        shadow-inner">
+            <div class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-1">
+              <span class="material-symbols-outlined text-3xl">cloud_upload</span>
+            </div>
+            <h2 class="font-headline text-base font-semibold text-white tracking-wide">Загрузить скриншоты</h2>
+            <p class="font-mono text-[11px] text-on-surface-variant tracking-wider uppercase">
+              PNG, JPG • один или несколько
+            </p>
+            <input id="file-input" type="file" accept="image/png, image/jpeg" multiple class="hidden">
           </label>
 
           <div id="upload-status" class="hidden rounded-lg bg-surface-container-low p-3 font-mono text-xs"></div>
@@ -465,27 +485,37 @@ tailwind.config = {
 
           <div id="queue-list" class="flex flex-col gap-3"></div>
 
+          <!-- Empty state (в стиле прототипа) -->
           <div id="queue-empty"
-     class="hidden items-center justify-center gap-2 py-3 px-4
-            bg-surface-container/30 border border-white/5 rounded-xl
-            my-auto text-center">
-  <span class="material-symbols-outlined text-lg text-on-surface-variant/40">inbox</span>
-  <p class="text-xs text-on-surface-variant">Очередь пуста. Добавьте скрины Uber / Bolt</p>
-</div>
+               class="hidden items-center justify-center gap-2 py-3 px-4
+                      bg-surface-container/30 border border-white/5 rounded-xl
+                      my-auto text-center">
+            <span class="material-symbols-outlined text-lg text-on-surface-variant/40">inbox</span>
+            <p class="text-xs text-on-surface-variant">Очередь пуста. Добавьте скрины Uber / Bolt</p>
+          </div>
 
           <div id="queue-hint" class="hidden font-mono text-[10px] text-tertiary text-center"></div>
 
-          <button id="btn-go-calc" onclick="goToCalculation()" disabled
-                  class="w-full h-12 rounded-xl bg-secondary text-on-secondary font-mono font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
-            <span class="material-symbols-outlined">calculate</span>
-            Рассчитать
-          </button>
+          <!-- Action buttons -->
+          <div class="flex flex-col gap-3 mt-auto pt-2">
+            <button id="btn-go-calc" onclick="goToCalculation()" disabled
+                    class="w-full py-3.5 px-4 rounded-xl font-headline font-semibold
+                           text-sm flex items-center justify-center gap-2 transition-all
+                           bg-secondary text-on-secondary
+                           disabled:opacity-40 disabled:cursor-not-allowed">
+              <span class="material-symbols-outlined text-xl">calculate</span>
+              <span>Рассчитать</span>
+            </button>
 
-          <button id="btn-clear-queue" onclick="clearQueue()" disabled
-                  class="w-full h-11 rounded-xl bg-surface-container-high text-error font-mono text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all disabled:cursor-not-allowed">
-            <span class="material-symbols-outlined text-base">delete_sweep</span>
-            Удалить все скрины
-          </button>
+            <button id="btn-clear-queue" onclick="clearQueue()" disabled
+                    class="w-full py-3 px-4 rounded-xl font-headline font-medium
+                           text-sm flex items-center justify-center gap-2 transition-all
+                           bg-surface-container-high text-error border border-error/10
+                           disabled:opacity-40 disabled:cursor-not-allowed">
+              <span class="material-symbols-outlined text-lg">delete_sweep</span>
+              <span>Удалить все скрины</span>
+            </button>
+          </div>
         </section>
       </div>
 
@@ -644,128 +674,129 @@ tailwind.config = {
       </div>
 
       <!-- PANEL 4: SETTINGS -->
-<div class="w-[20%] shrink-0 px-4" data-tab-panel="settings">
-  <section id="tab-settings" class="flex flex-col gap-4">
-    <div id="skeleton-settings" class="hidden flex-col gap-4">
-      <div class="skeleton h-6 w-32"></div>
-      <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
-        <div class="skeleton h-10 w-full"></div>
+      <div class="w-[20%] shrink-0 px-4" data-tab-panel="settings">
+        <section id="tab-settings" class="flex flex-col gap-4">
+          <div id="skeleton-settings" class="hidden flex-col gap-4">
+            <div class="skeleton h-6 w-32"></div>
+            <div class="bg-surface-container-low rounded-xl p-4 flex flex-col gap-4">
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+              <div class="skeleton h-10 w-full"></div>
+            </div>
+          </div>
+
+          <div id="settings-content" class="flex flex-col gap-3">
+            <!-- Заголовок + версия -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-xl">tune</span>
+                <h2 class="font-headline text-xl font-bold tracking-tight text-white">Настройки</h2>
+              </div>
+              <span class="font-mono text-[11px] px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface-variant border border-white/5">
+                v30.5
+              </span>
+            </div>
+
+            <!-- Основная карточка -->
+            <div class="bg-surface-container-low/95 rounded-2xl p-3 flex flex-col gap-2.5 border border-white/5 shadow-xl backdrop-blur-md">
+
+              <!-- Переключатели: Режим + База партнёрки -->
+              <div class="grid grid-cols-2 gap-2">
+                <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
+                  <div class="flex justify-between items-center">
+                    <label class="font-mono text-[10px] text-on-surface-variant uppercase font-medium">Режим</label>
+                    <span class="font-mono text-[9px] text-slate-400">lite/pro</span>
+                  </div>
+                  <div class="bg-surface-container-high rounded-lg p-0.5 flex border border-white/5">
+                    <button id="set-lite" class="flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white">Lite</button>
+                    <button id="set-pro"  class="flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]">Pro</button>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
+                  <div class="flex justify-between items-center">
+                    <label class="font-mono text-[10px] text-on-surface-variant uppercase font-medium truncate">База партнёрки</label>
+                    <span class="font-mono text-[9px] text-slate-400">база</span>
+                  </div>
+                  <div class="bg-surface-container-high rounded-lg p-0.5 flex border border-white/5">
+                    <button id="set-base-gross" class="flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]">Gross</button>
+                    <button id="set-base-net"   class="flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white">Net</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Числовые параметры: 2×2 -->
+              <div class="grid grid-cols-2 gap-2">
+                <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
+                  <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Партнёрка %</label>
+                  <div class="relative flex items-center">
+                    <input id="set-partner-pct" type="number" step="0.01" value="5.00"
+                           class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
+                    <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none font-bold">%</span>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
+                  <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Налог бонусы %</label>
+                  <div class="relative flex items-center">
+                    <input id="set-promo-tax" type="number" step="0.01" value="23.00"
+                           class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
+                    <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none font-bold">%</span>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
+                  <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Комиссия (PLN/нед)</label>
+                  <div class="relative flex items-center">
+                    <input id="set-weekly-fee" type="number" step="1" value="60"
+                           class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
+                    <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+                  </div>
+                </div>
+
+                <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
+                  <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">ZUS (PLN)</label>
+                  <div class="relative flex items-center">
+                    <input id="set-zus" type="number" step="1" value="350"
+                           class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
+                    <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Амортизация — на всю ширину -->
+              <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
+                <div class="flex justify-between items-center">
+                  <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Амортизация авто (PLN/км)</label>
+                  <span class="font-mono text-[10px] text-emerald-400">Pro режим</span>
+                </div>
+                <div class="relative flex items-center">
+                  <input id="set-dep-rate" type="number" step="0.01" value="0.50"
+                         class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
+                  <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none">zł / км</span>
+                </div>
+              </div>
+
+              <!-- Кнопки действий -->
+              <div class="flex items-center gap-2 pt-1">
+                <button id="btn-save-settings" onclick="saveSettings()"
+                        class="flex-1 h-11 rounded-xl bg-primary hover:bg-primary-fixed text-on-primary font-mono font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-[0_0_18px_rgba(109,255,186,0.35)]">
+                  <span class="material-symbols-outlined text-lg">check_circle</span>
+                  <span id="btn-save-settings-text">Сохранить настройки</span>
+                </button>
+                <button onclick="resetSettings()" title="Сбросить к дефолту" aria-label="Сбросить к дефолту"
+                        class="w-11 h-11 shrink-0 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-error font-mono flex items-center justify-center active:scale-[0.95] transition-all border border-white/5">
+                  <span class="material-symbols-outlined text-xl">restart_alt</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
-    </div>
 
-    <div id="settings-content" class="flex flex-col gap-3">
-      <!-- Заголовок + версия -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-primary text-xl">tune</span>
-          <h2 class="font-headline text-xl font-bold tracking-tight text-white">Настройки</h2>
-        </div>
-        <span class="font-mono text-[11px] px-2.5 py-1 rounded-lg bg-surface-container-high text-on-surface-variant border border-white/5">
-          v30.5
-        </span>
-      </div>
-
-      <!-- Основная карточка -->
-      <div class="bg-surface-container-low/95 rounded-2xl p-3 flex flex-col gap-2.5 border border-white/5 shadow-xl backdrop-blur-md">
-
-        <!-- Переключатели: Режим + База партнёрки -->
-        <div class="grid grid-cols-2 gap-2">
-          <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
-            <div class="flex justify-between items-center">
-              <label class="font-mono text-[10px] text-on-surface-variant uppercase font-medium">Режим</label>
-              <span class="font-mono text-[9px] text-slate-400">lite/pro</span>
-            </div>
-            <div class="bg-surface-container-high rounded-lg p-0.5 flex border border-white/5">
-              <button id="set-lite" class="flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white">Lite</button>
-              <button id="set-pro"  class="flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]">Pro</button>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
-            <div class="flex justify-between items-center">
-              <label class="font-mono text-[10px] text-on-surface-variant uppercase font-medium truncate">База партнёрки</label>
-              <span class="font-mono text-[9px] text-slate-400">база</span>
-            </div>
-            <div class="bg-surface-container-high rounded-lg p-0.5 flex border border-white/5">
-              <button id="set-base-gross" class="flex-1 py-1 rounded font-mono text-[11px] font-bold uppercase transition-all bg-primary text-on-primary shadow-[0_0_10px_rgba(109,255,186,0.25)]">Gross</button>
-              <button id="set-base-net"   class="flex-1 py-1 rounded font-mono text-[11px] font-semibold uppercase transition-all text-on-surface-variant hover:text-white">Net</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Числовые параметры: 2×2 -->
-        <div class="grid grid-cols-2 gap-2">
-          <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
-            <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Партнёрка %</label>
-            <div class="relative flex items-center">
-              <input id="set-partner-pct" type="number" step="0.01" value="5.00"
-                     class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
-              <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none font-bold">%</span>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
-            <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Налог бонусы %</label>
-            <div class="relative flex items-center">
-              <input id="set-promo-tax" type="number" step="0.01" value="23.00"
-                     class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
-              <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none font-bold">%</span>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
-            <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Комиссия (PLN/нед)</label>
-            <div class="relative flex items-center">
-              <input id="set-weekly-fee" type="number" step="1" value="60"
-                     class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
-              <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
-            </div>
-          </div>
-
-          <div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
-            <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">ZUS (PLN)</label>
-            <div class="relative flex items-center">
-              <input id="set-zus" type="number" step="1" value="350"
-                     class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
-              <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none">zł</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Амортизация — на всю ширину -->
-<div class="flex flex-col gap-1 bg-surface-container/60 p-2 rounded-xl border border-white/5">
-  <div class="flex justify-between items-center">
-    <label class="font-mono text-[10px] text-on-surface-variant uppercase truncate">Амортизация авто (PLN/км)</label>
-    <span class="font-mono text-[10px] text-emerald-400">Pro режим</span>
-  </div>
-  <div class="relative flex items-center">
-    <input id="set-dep-rate" type="number" step="0.01" value="0.50"
-           class="w-full bg-surface-container-lowest text-on-surface font-mono text-base font-bold px-2.5 py-1.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-primary/50">
-    <span class="absolute right-2.5 font-mono text-xs text-on-surface-variant pointer-events-none">zł / км</span>
-  </div>
-</div>
-
-        <!-- Кнопки действий -->
-        <div class="flex items-center gap-2 pt-1">
-          <button id="btn-save-settings" onclick="saveSettings()"
-                  class="flex-1 h-11 rounded-xl bg-primary hover:bg-primary-fixed text-on-primary font-mono font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-[0_0_18px_rgba(109,255,186,0.35)]">
-            <span class="material-symbols-outlined text-lg">check_circle</span>
-            <span id="btn-save-settings-text">Сохранить настройки</span>
-          </button>
-          <button onclick="resetSettings()" title="Сбросить к дефолту" aria-label="Сбросить к дефолту"
-                  class="w-11 h-11 shrink-0 rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-error font-mono flex items-center justify-center active:scale-[0.95] transition-all border border-white/5">
-            <span class="material-symbols-outlined text-xl">restart_alt</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </section>
-</div>
   <!-- ═════════ END SWIPE CAROUSEL ═════════ -->
 
 </main>
